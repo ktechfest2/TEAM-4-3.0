@@ -46,3 +46,21 @@ Researched 2026-11-18. Each claim has a source link. Items marked **UNVERIFIED**
 2. **Tools must answer in under 9 s.** Slow work (verifier fan-out calls) uses the 202 + call-note pattern, or a callback call to the voter.
 3. **No INEC API.** The PU directory is seeded from INEC's public PU list for a demo LGA, and official notices (relocations) are entered by an authorised admin. We do not scrape INEC.
 4. **Flash-to-callback.** Many voters cannot afford airtime. A second Telnyx number on Call Control rejects the incoming call (so the caller pays nothing) and Confam calls them back.
+
+## 7. Elderly voters and voting by phone (researched 2026-11-18, round 2)
+
+**Phone or remote voting is illegal in Nigeria under the Electoral Act 2026** (full text: https://thewest.ng/wp-content/uploads/2026/03/ElectoralAct2026.pdf, read directly):
+- **s.55:** "A voter shall not record his or her vote otherwise than by personally attending at the polling unit or voting centres and recording his or her vote in the manner prescribed by the Commission."
+- **s.47(2):** voters are accredited at the PU with BVAS, which verifies particulars biometrically (in person).
+- **s.54(1):** a voter with a visual impairment or other disability may bring **a person of their choice** into the voting compartment. "No political party agent, candidate or party official" may accompany them.
+- **s.54(2):** INEC "shall take reasonable steps" to assist "persons with disabilities, special needs and **vulnerable persons**" with Braille, large print, electronic devices, sign language, "or **off-site voting in appropriate cases**".
+- **Definitions:** "vulnerable person" explicitly includes "**the sick and the elderly**". So elderly voters are entitled to s.54(2) support.
+- **Guidelines para 25 (2022 Regulations):** the elderly, PWDs, pregnant women and nursing mothers get **priority access** at PUs. → [PLAC factsheet](https://placng.org/i/wp-content/uploads/2023/02/Factsheet-on-the-Electoral-Act-Provisions-Improving-the-Participation-of-Marginalised-Groups-in-Nigerian-Elections.pdf), [NAN: prioritise older persons](https://nannews.ng/2023/02/23/prioritise-older-persons-on-election-day-coalition-urges-inec)
+- **BVAS facial recognition fails more often for elderly voters** (2026 off-cycle elections). Observers want an alternative verification route. → [TechPolicy.Press](https://techpolicy.press/when-nigerias-election-technology-cannot-recognize-the-voter)
+- In 2023, priority access often wasn't applied in practice. → [Dataphyte](https://elections.dataphyte.com/insights/nigeriadecides-vulnerable-voters-neglected-in-nigerias-voting-process)
+
+**How phone voting works elsewhere (a future, not something to build now):**
+- **Australia (AEC):** blind and low-vision voters register by phone (roll check plus a 6-digit PIN they choose, then an 8-digit registration number is issued). They then call back and vote with a **human operator** using only the number and PIN, so the vote stays anonymous. It runs for 10 business days before polling day. → [AEC telephone voting](https://aec.gov.au/Voting/Ways_to_vote/telephone.htm), [AEC BLV voters](https://aec.gov.au/referendums/vote/blv-voters.html)
+- **Canada (Ontario municipalities):** over 215 use internet or telephone (IVR) voting, with a mailed PIN plus date of birth. Canada's online-voting standard **excludes IVR from its scope**, so security assurance is weaker. → [Simply Voting PIA](https://www.hanover.ca/sites/default/files/2026-08/Simply%20Voting_PIA_ReRA_Ontario_Municipal%202026-05-25.pdf), [Kawartha Lakes](https://kawarthalakes-014-ca.govstack.com/government-administration/elections/electronic-voting/)
+
+**Conclusion.** Building phone voting would break s.55 and could not prove the voter's identity (BVAS) or keep the ballot secret on a shared basic phone. What the law already allows, and what the agent can make actually happen, is: **priority access, a helper chosen by the voter, and s.54(2) off-site or assisted arrangements requested in advance**, plus a "go now, the queue is short and officials are there" call. A phone ballot like Australia's AEC model can be a "future, requires amending s.55" slide in the pitch.
