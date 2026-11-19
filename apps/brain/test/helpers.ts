@@ -6,7 +6,7 @@ import { AethexClient } from "../src/aethex/client.ts";
 import type { Config } from "../src/config.ts";
 import type { AppDeps, JobQueue, SendOptions } from "../src/context.ts";
 import { handleAlertGoNow, handleAlertNotice } from "../src/workers/alerts.ts";
-import { handleAlertCase, handleCaseAggregate, handleCaseVerify } from "../src/workers/cases.ts";
+import { handleAlertCase, handleCaseAggregate, handleCaseVerify, overrideVerdict } from "../src/workers/cases.ts";
 import { handleDial } from "../src/workers/dial.ts";
 import { handleSweepLateness } from "../src/workers/sweep.ts";
 import { handleWebhook } from "../src/workers/webhook.ts";
@@ -58,6 +58,7 @@ export async function runJob(deps: AppDeps, name: string, data: any) {
   switch (name) {
     case QUEUES.caseVerify: return handleCaseVerify(deps, data);
     case QUEUES.caseAggregate: return handleCaseAggregate(deps, data);
+    case QUEUES.caseOverride: return overrideVerdict(deps, data);
     case QUEUES.alertCase: return handleAlertCase(deps, data);
     case QUEUES.alertNotice: return handleAlertNotice(deps, data);
     case QUEUES.alertGoNow: return handleAlertGoNow(deps, data);

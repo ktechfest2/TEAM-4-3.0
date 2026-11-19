@@ -1,8 +1,8 @@
 import { PgBoss } from "pg-boss";
-import { QUEUES, type AlertCaseJob, type AlertGoNowJob, type AlertNoticeJob, type CaseAggregateJob, type CaseVerifyJob, type DialJob, type WebhookJob } from "@confam/db";
+import { QUEUES, type AlertCaseJob, type AlertGoNowJob, type AlertNoticeJob, type CaseAggregateJob, type CaseOverrideJob, type CaseVerifyJob, type DialJob, type WebhookJob } from "@confam/db";
 import type { AppDeps, JobQueue } from "../context.ts";
 import { handleAlertGoNow, handleAlertNotice } from "./alerts.ts";
-import { handleAlertCase, handleCaseAggregate, handleCaseVerify } from "./cases.ts";
+import { handleAlertCase, handleCaseAggregate, handleCaseVerify, overrideVerdict } from "./cases.ts";
 import { handleDial } from "./dial.ts";
 import { handleSweepLateness } from "./sweep.ts";
 import { handleWebhook } from "./webhook.ts";
@@ -40,6 +40,7 @@ export async function startWorkers(boss: PgBoss, deps: AppDeps): Promise<void> {
 
   await one<CaseVerifyJob>(QUEUES.caseVerify, (d) => handleCaseVerify(deps, d));
   await one<CaseAggregateJob>(QUEUES.caseAggregate, (d) => handleCaseAggregate(deps, d));
+  await one<CaseOverrideJob>(QUEUES.caseOverride, (d) => overrideVerdict(deps, d));
   await one<AlertCaseJob>(QUEUES.alertCase, (d) => handleAlertCase(deps, d));
   await one<AlertNoticeJob>(QUEUES.alertNotice, (d) => handleAlertNotice(deps, d));
   await one<AlertGoNowJob>(QUEUES.alertGoNow, (d) => handleAlertGoNow(deps, d));

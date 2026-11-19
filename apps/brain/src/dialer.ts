@@ -103,6 +103,7 @@ export async function dial(deps: AppDeps, req: DialRequest): Promise<DialOutcome
       and(
         eq(outboundAttempt.personId, p.id),
         eq(outboundAttempt.purpose, req.purpose),
+        eq(outboundAttempt.refId, req.refId),
         eq(outboundAttempt.decision, "dialled"),
         gte(outboundAttempt.at, new Date(now.getTime() - COOLDOWN_MS)),
       ),

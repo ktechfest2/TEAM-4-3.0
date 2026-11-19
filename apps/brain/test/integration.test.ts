@@ -120,6 +120,23 @@ describe("rumour pipeline (end to end)", () => {
     expect(second.body.say).toContain("not true");
   });
 
+  it("lets the control room override a verdict, superseding the fact and sending corrections", async () => {
+    const r = await tool("report_claim", { claim_en: "Ballot box snatched at Coker", category: "violence", place: "Coker primary school" }, { callId: env.aethex.addInbound(TEAM[1]!) });
+    env.setNow(new Date(Date.now() + 11 * 60_000));
+    env.jobs.take(QUEUES.caseVerify);
+    await env.deps.jobs.send(QUEUES.caseAggregate, { caseId: r.body.case_id, reason: "deadline" });
+    await env.jobs.drain(env.deps, [QUEUES.caseAggregate, QUEUES.alertCase, QUEUES.dial]);
+    env.setNow(new Date());
+    env.aethex.triggered = [];
+    await env.deps.jobs.send(QUEUES.caseOverride, { caseId: r.body.case_id, verdict: "false", by: "admin@test" });
+    await env.jobs.drain(env.deps, [QUEUES.caseOverride, QUEUES.alertCase, QUEUES.dial]);
+    const facts = await env.deps.db.select().from(fact).where(eq(fact.caseId, r.body.case_id));
+    expect(facts).toHaveLength(2);
+    expect(facts.filter((f) => f.supersededAt === null).map((f) => f.verdict)).toEqual(["false"]);
+    expect(env.aethex.triggered.map((t) => t.to_number)).toEqual([TEAM[1]]);
+    expect(String(env.aethex.triggered[0]!.dynamic_variables.alert_script_en)).toContain("Correction");
+  });
+
   it("merges duplicate reports into one open case", async () => {
     const a = await tool("report_claim", { claim_en: "Vote buying at Ojuelegba", category: "vote_buying", place: "Ojuelegba" }, { callId: env.aethex.addInbound("+2348030000001") });
     const b = await tool("report_claim", { claim_en: "They are buying votes at Ojuelegba", category: "vote_buying", place: "Yaba Ojuelegba" }, { callId: env.aethex.addInbound("+2348030000002") });

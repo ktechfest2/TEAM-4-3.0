@@ -2,6 +2,7 @@
 export const QUEUES = {
   caseVerify: "case-verify",
   caseAggregate: "case-aggregate",
+  caseOverride: "case-override",
   alertCase: "alert-case",
   alertNotice: "alert-notice",
   alertGoNow: "alert-go-now",
@@ -14,6 +15,7 @@ export type QueueName = (typeof QUEUES)[keyof typeof QUEUES];
 
 export interface CaseVerifyJob { caseId: string }
 export interface CaseAggregateJob { caseId: string; reason: "answer" | "deadline" | "override" }
+export interface CaseOverrideJob { caseId: string; verdict: "confirmed" | "false" | "unverified"; by: string }
 export interface AlertCaseJob { caseId: string; correction?: boolean }
 export interface AlertNoticeJob { noticeId: string }
 export interface AlertGoNowJob { puId: string }
