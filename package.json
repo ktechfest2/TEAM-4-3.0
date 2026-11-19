@@ -1,0 +1,37 @@
+{
+  "name": "confam",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present",
+    "db:generate": "npm run generate -w @confam/db",
+    "db:migrate": "npm run migrate -w @confam/db",
+    "db:seed": "npm run seed -w @confam/db",
+    "dev:brain": "npm run dev -w @confam/brain"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.1"
+  },
+  "allowScripts": {
+    "esbuild@0.18.20": true,
+    "esbuild@0.25.12": true,
+    "esbuild@0.28.2": true,
+    "cpu-features": false,
+    "ssh2": false,
+    "protobufjs": false,
+    "fsevents": false
+  }
+}
