@@ -122,7 +122,7 @@ describe("caller number fast path", () => {
 
 describe("Nigerian caller ID with the trunk 0 (+2340…)", () => {
   const NG_VOTER = "+2349012345678";
-  const NG_VOTER_AS_PRESENTED = "+23409012345678"; // how Nigerian networks often present it
+  const NG_VOTER_AS_PRESENTED = "+12349012345678"; // how it arrives on our US number (carrier-prefixed +1)
   it("recognises a registered voter and calls the reporter back on the correct number", async () => {
     const { person: personTable, subscription: subTable } = await import("@confam/db");
     const [p] = await env.deps.db

@@ -103,6 +103,11 @@ describe("phones", () => {
     // Nigerian caller IDs often keep the trunk 0 after the country code
     expect(normalizePhone("+23407012345678")).toBe("+2347012345678");
     expect(normalizePhone("23409012345678")).toBe("+2349012345678");
+    // ...and US carriers sometimes prefix +1 to a full Nigerian number
+    expect(normalizePhone("+12347012345678")).toBe("+2347012345678");
+    expect(normalizePhone("+123407012345678")).toBe("+2347012345678");
+    // a genuine US number in area code 234 is untouched
+    expect(normalizePhone("+12345678901")).toBe("+12345678901");
     expect(() => normalizePhone("hello")).toThrow();
   });
   it("encrypts reversibly and hashes deterministically", () => {
