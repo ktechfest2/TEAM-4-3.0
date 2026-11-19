@@ -6,7 +6,7 @@ import { listCases } from "@/lib/server/data";
 
 export const metadata: Metadata = { title: "Rumours" };
 
-export default async function Rumours({ searchParams }: PageProps<"/rumours">) {
+export default async function Rumours({ searchParams }: PageProps<"/control/rumours">) {
   const sp = await searchParams;
   const filter = sp.status === "verifying" || sp.status === "published" ? sp.status : undefined;
   const cases = await listCases(filter);
@@ -26,7 +26,7 @@ export default async function Rumours({ searchParams }: PageProps<"/rumours">) {
               key={t.label}
               role="tab"
               aria-selected={on}
-              href={t.key ? `/rumours?status=${t.key}` : "/rumours"}
+              href={t.key ? `/control/rumours?status=${t.key}` : "/control/rumours"}
               className={`btn ${on ? "btn-primary" : "btn-quiet"} py-1.5 text-sm`}
             >
               {t.label}
@@ -53,7 +53,7 @@ export default async function Rumours({ searchParams }: PageProps<"/rumours">) {
                 {cases.map((c) => (
                   <tr key={c.id} className="transition-colors duration-200 hover:bg-surface-2">
                     <td className="px-5 py-4">
-                      <Link href={`/rumours/${c.id}`} className="link-u font-semibold">{c.claim}</Link>
+                      <Link href={`/control/rumours/${c.id}`} className="link-u font-semibold">{c.claim}</Link>
                       <div className="mt-1 flex items-center gap-2 text-sm text-muted">
                         <Tag tone={c.category === "violence" ? "bad" : "neutral"}>{CATEGORY_LABEL[c.category]}</Tag>
                         {timeAgo(c.createdAt)}

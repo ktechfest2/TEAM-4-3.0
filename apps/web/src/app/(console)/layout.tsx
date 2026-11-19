@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { LagosClock, PauseSwitch } from "@/components/controls";
 import { LiveRefresh } from "@/components/live";
@@ -6,6 +7,11 @@ import { logout } from "@/lib/server/actions";
 import { getCounters, getSettings } from "@/lib/server/data";
 import { requireUser } from "@/lib/server/session";
 
+export const metadata: Metadata = {
+  title: { default: "Control room", template: "%s · Confam control room" },
+  robots: { index: false, follow: false },
+};
+
 export default async function ConsoleLayout({ children }: LayoutProps<"/">) {
   const user = await requireUser();
   const [settings, counters] = await Promise.all([getSettings(), getCounters()]);
@@ -13,7 +19,7 @@ export default async function ConsoleLayout({ children }: LayoutProps<"/">) {
     <div className="flex min-h-screen flex-col lg:flex-row">
       <aside className="border-b border-line bg-surface lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-64 lg:shrink-0 lg:flex-col lg:border-b-0 lg:border-r">
         <div className="flex items-center justify-between gap-4 px-4 py-4 lg:block lg:px-5 lg:py-6">
-          <Link href="/" className="block" aria-label="Confam control room home">
+          <Link href="/control" className="block" aria-label="Confam control room home">
             <span className="block font-display text-[2.4rem] font-extrabold uppercase leading-[0.8] tracking-[-0.02em]">Confam</span>
             <span className="mt-1 block text-[13px] font-medium text-muted">INEC control room, Surulere LGA</span>
           </Link>

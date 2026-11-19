@@ -104,7 +104,7 @@ export async function getFeed(limit = 24): Promise<FeedItem[]> {
       .limit(limit),
   ]);
   const items: FeedItem[] = [
-    ...reports.map((r) => ({ id: `r-${r.id}`, kind: "report" as const, at: r.at, title: "Rumour reported", detail: r.claim, tone: "warn" as const, href: `/rumours/${r.caseId}` })),
+    ...reports.map((r) => ({ id: `r-${r.id}`, kind: "report" as const, at: r.at, title: "Rumour reported", detail: r.claim, tone: "warn" as const, href: `/control/rumours/${r.caseId}` })),
     ...verdicts.map((v) => ({
       id: `v-${v.id}`,
       kind: "verdict" as const,
@@ -112,7 +112,7 @@ export async function getFeed(limit = 24): Promise<FeedItem[]> {
       title: v.overriddenBy ? `Verdict set: ${v.verdict}` : `Verdict: ${v.verdict}`,
       detail: v.claim,
       tone: (v.verdict === "false" ? "good" : v.verdict === "confirmed" ? "bad" : "neutral") as FeedItem["tone"],
-      href: `/rumours/${v.id}`,
+      href: `/control/rumours/${v.id}`,
     })),
     ...checkins.map((c) => ({
       id: `c-${c.id}`,
@@ -121,7 +121,7 @@ export async function getFeed(limit = 24): Promise<FeedItem[]> {
       title: `${c.pu}: ${eventLabel(c.event)}`,
       detail: c.event === "delay" && c.eta ? `ETA ${c.eta} min` : "Official check-in",
       tone: (c.event === "delay" || c.event === "issue" ? "warn" : "good") as FeedItem["tone"],
-      href: "/units",
+      href: "/control/units",
     })),
     ...attempts.map((a) => ({
       id: `o-${a.id}`,
@@ -130,7 +130,7 @@ export async function getFeed(limit = 24): Promise<FeedItem[]> {
       title: `${outboundLabel(a.purpose)}: ${decisionLabel(a.decision)}`,
       detail: a.name ?? "Unknown person",
       tone: (a.decision === "error" ? "bad" : a.decision === "dialled" ? "ink" : "neutral") as FeedItem["tone"],
-      href: "/calls",
+      href: "/control/calls",
     })),
   ];
   return items.sort((a, b) => b.at.getTime() - a.at.getTime()).slice(0, limit);

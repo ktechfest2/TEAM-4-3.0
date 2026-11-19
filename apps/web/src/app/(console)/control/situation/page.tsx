@@ -24,7 +24,7 @@ export default async function Situation() {
                 <li key={f.id} className="px-5 py-4">
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
-                      <Link href={f.caseId ? `/rumours/${f.caseId}` : "/rumours"} className="link-u font-semibold">{f.claim}</Link>
+                      <Link href={f.caseId ? `/control/rumours/${f.caseId}` : "/control/rumours"} className="link-u font-semibold">{f.claim}</Link>
                       <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted">
                         <Tag tone={f.category === "violence" ? "bad" : "neutral"}>{CATEGORY_LABEL[f.category]}</Tag>
                         {f.pu ?? titleCase(f.ward ?? "")}, verified {timeAgo(f.createdAt)}, reused until {lagosTime(f.validUntil)}
@@ -65,7 +65,7 @@ export default async function Situation() {
               <ul className="divide-y divide-line">
                 {open.map((c) => (
                   <li key={c.id}>
-                    <Link href={`/rumours/${c.id}`} className="block px-5 py-3 transition-colors duration-200 hover:bg-surface-2">
+                    <Link href={`/control/rumours/${c.id}`} className="block px-5 py-3 transition-colors duration-200 hover:bg-surface-2">
                       <span className="font-semibold">{c.claim}</span>
                       <span className="block text-sm text-muted">{c.pu ?? titleCase(c.ward ?? "")}, asked {c.asked}, answered {c.answered}, deadline {lagosTime(c.deadlineAt)}</span>
                     </Link>

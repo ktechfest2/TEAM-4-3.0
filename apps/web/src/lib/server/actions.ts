@@ -46,7 +46,7 @@ export async function login(_prev: ActionState, form: FormData): Promise<ActionS
   }
   loginAttempts.delete(email);
   await createSession({ id: u.id, email: u.email, role: u.role });
-  redirect("/");
+  redirect("/control");
 }
 
 export async function logout(): Promise<void> {
@@ -61,7 +61,7 @@ export async function setOutboundPaused(paused: boolean): Promise<ActionState> {
   const { db, pool } = getDb();
   await db.update(systemSettings).set({ outboundPaused: paused, updatedAt: new Date() }).where(eq(systemSettings.id, 1));
   await notify(pool, { type: "settings" });
-  revalidatePath("/", "layout");
+  revalidatePath("/control", "layout");
   return { ok: true, message: paused ? "Outbound calls paused. Nothing will be dialled." : "Outbound calls are live." };
 }
 
@@ -92,7 +92,7 @@ export async function updateSettings(_prev: ActionState, form: FormData): Promis
   const { db, pool } = getDb();
   await db.update(systemSettings).set({ ...parsed.data, updatedAt: new Date() }).where(eq(systemSettings.id, 1));
   await notify(pool, { type: "settings" });
-  revalidatePath("/", "layout");
+  revalidatePath("/control", "layout");
   return { ok: true, message: "Settings saved." };
 }
 
@@ -105,7 +105,7 @@ export async function overrideVerdict(caseId: string, verdict: "confirmed" | "fa
   const [c] = await getDb().db.select({ id: claimCase.id }).from(claimCase).where(eq(claimCase.id, caseId));
   if (!c) return fail("This rumour no longer exists.");
   await sendJob(QUEUES.caseOverride, { caseId, verdict, by: user.email });
-  revalidatePath(`/rumours/${caseId}`);
+  revalidatePath(`/control/rumours/${caseId}`);
   return { ok: true, message: "Verdict set. Everyone who reported it gets a correction call." };
 }
 
@@ -132,7 +132,7 @@ export async function createRelocation(_prev: ActionState, form: FormData): Prom
   });
   await sendJob(QUEUES.alertNotice, { noticeId: n!.id }, { singletonKey: `notice:${n!.id}` });
   await notify(pool, { type: "notice", id: n!.id });
-  revalidatePath("/units");
+  revalidatePath("/control/units");
   return { ok: true, message: `Notice issued. Confam is calling everyone subscribed to ${oldPu.name}.` };
 }
 
@@ -140,7 +140,7 @@ export async function undoRelocation(puId: string): Promise<ActionState> {
   await requireAdmin();
   if (!z.string().uuid().safeParse(puId).success) return fail("Unknown polling unit.");
   await getDb().db.update(pollingUnit).set({ status: "active", relocatedToId: null }).where(eq(pollingUnit.id, puId));
-  revalidatePath("/units");
+  revalidatePath("/control/units");
   return { ok: true, message: "Marked as active again. No calls are made for this change." };
 }
 
@@ -191,7 +191,7 @@ export async function addVoter(_prev: ActionState, form: FormData): Promise<Acti
     .values({ personId, puId: parsed.data.puId, kind: "voter", needs })
     .onConflictDoUpdate({ target: [subscription.personId, subscription.puId], set: { kind: "voter", active: true, needs } });
   await notify(pool, { type: "person", id: personId });
-  revalidatePath("/voters");
+  revalidatePath("/control/voters");
   return { ok: true, message: `${parsed.data.displayName} is now on the voter list. They can call Confam to check their polling unit and will be called if it changes.` };
 }
 
@@ -216,7 +216,7 @@ export async function moveVoter(personId: string, newPuId: string): Promise<Acti
   });
   await sendJob(QUEUES.alertTransfer, { personId, fromPuId: current.puId, toPuId: newPuId, transferId: randomUUID() });
   await notify(pool, { type: "person", id: personId });
-  revalidatePath("/voters");
+  revalidatePath("/control/voters");
   return { ok: true, message: `Moved to ${to.name}. Confam is calling them now.` };
 }
 
@@ -241,7 +241,7 @@ export async function addOfficial(_prev: ActionState, form: FormData): Promise<A
   await db.delete(role).where(and(eq(role.personId, personId), eq(role.kind, "official")));
   await db.insert(role).values({ personId, kind: "official", wardId: pu.wardId, puId: parsed.data.puId, pinHash: await hashSecret(pin) });
   await notify(pool, { type: "person", id: personId });
-  revalidatePath("/officials");
+  revalidatePath("/control/officials");
   return { ok: true, message: `${parsed.data.displayName} is now the presiding officer for ${pu.name}. Share this check-in PIN privately; it is shown once.`, secret: pin };
 }
 
@@ -255,7 +255,7 @@ export async function resetPin(roleId: string): Promise<ActionState> {
     .where(and(eq(role.id, roleId), eq(role.kind, "official")))
     .returning({ id: role.id });
   if (res.length === 0) return fail("Only polling officials have PINs.");
-  revalidatePath("/officials");
+  revalidatePath("/control/officials");
   return { ok: true, message: "New PIN issued. Share it with the official privately; it is shown once.", secret: pin };
 }
 
@@ -268,7 +268,7 @@ export async function removePerson(personId: string): Promise<ActionState> {
   await db.update(subscription).set({ active: false }).where(eq(subscription.personId, personId));
   await db.delete(role).where(eq(role.personId, personId));
   await notify(pool, { type: "person", id: personId });
-  revalidatePath("/voters");
-  revalidatePath("/officials");
+  revalidatePath("/control/voters");
+  revalidatePath("/control/officials");
   return { ok: true, message: "Removed. Their number has been erased and will never be called." };
 }

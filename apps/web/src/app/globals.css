@@ -254,3 +254,81 @@ body {
     transform: translateY(0);
   }
 }
+
+/* ---------- Landing page ----------
+ * Editorial and calm: a light serif for headlines, a quiet sans for reading, hierarchy from size and space.
+ * One accent (INEC green) for action; indelible-ink violet only for the verdict stamp.
+ */
+.landing {
+  --l-paper: #f3f4ef;
+  --l-paper-2: #e8ebe3;
+  --l-ink: #14211b;
+  --l-soft: #4f5d55;
+  --l-line: #d3d9d0;
+  --l-green: #0a7a3d;
+  --l-violet: #4a2c7a;
+  --l-night: #0f1c16;
+  background: var(--l-paper);
+  color: var(--l-ink);
+  font-family: var(--font-plex-sans), system-ui, sans-serif;
+  font-feature-settings: "kern" 1, "liga" 1;
+}
+.landing .serif {
+  font-family: var(--font-newsreader), Georgia, serif;
+  font-optical-sizing: auto;
+}
+.landing a.l-link {
+  background: linear-gradient(currentColor 0 0) 0 100% / 100% 1px no-repeat;
+  transition: background-size 350ms var(--ease-out), color 200ms ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .landing a.l-link:hover {
+    background-size: 0% 1px;
+    background-position: 100% 100%;
+  }
+}
+.landing .l-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  border-radius: 999px;
+  padding: 0.85rem 1.35rem;
+  font-weight: 500;
+  transition:
+    transform var(--dur-press) var(--ease-out),
+    background-color var(--dur-ui) ease,
+    color var(--dur-ui) ease;
+}
+.landing .l-btn:active {
+  transform: scale(0.97);
+}
+.landing .l-btn-solid {
+  background: var(--l-ink);
+  color: var(--l-paper);
+}
+.landing .l-btn-ghost {
+  box-shadow: inset 0 0 0 1px var(--l-line);
+}
+@media (hover: hover) and (pointer: fine) {
+  .landing .l-btn-solid:hover {
+    background: var(--l-green);
+  }
+  .landing .l-btn-ghost:hover {
+    box-shadow: inset 0 0 0 1px var(--l-ink);
+  }
+}
+/* A keypad phone's backlit LCD */
+.landing .lcd {
+  background: #c9d7a9;
+  color: #1f2a12;
+  font-family: var(--font-plex-mono), ui-monospace, monospace;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+.js .landing [data-reveal] {
+  visibility: hidden;
+}
+@media (prefers-reduced-motion: reduce) {
+  .js .landing [data-reveal] {
+    visibility: visible;
+  }
+}

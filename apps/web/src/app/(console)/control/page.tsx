@@ -46,7 +46,7 @@ export default async function Overview() {
           ))}
           {counters.outboundFailed > 0 && (
             <div className="col-span-3 bg-surface px-3 py-2 text-sm text-bad">
-              {counters.outboundFailed} outbound call{counters.outboundFailed === 1 ? "" : "s"} failed in the last 24h. <Link className="link-u font-semibold" href="/calls">See why</Link>
+              {counters.outboundFailed} outbound call{counters.outboundFailed === 1 ? "" : "s"} failed in the last 24h. <Link className="link-u font-semibold" href="/control/calls">See why</Link>
             </div>
           )}
         </dl>
@@ -54,14 +54,14 @@ export default async function Overview() {
 
       <div className="grid gap-6 xl:grid-cols-[1.55fr_1fr]">
         <div className="space-y-6">
-          <Panel title="Rumours being checked" aside={<Link href="/rumours" className="link-u text-sm font-semibold">All rumours</Link>}>
+          <Panel title="Rumours being checked" aside={<Link href="/control/rumours" className="link-u text-sm font-semibold">All rumours</Link>}>
             {open.length === 0 ? (
               <p className="px-5 py-8 text-muted">When someone reports something Confam hasn&apos;t verified, it appears here while the official at that polling unit is called.</p>
             ) : (
               <ul className="divide-y divide-line">
                 {open.map((c) => (
                   <li key={c.id}>
-                    <Link href={`/rumours/${c.id}`} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 transition-colors duration-200 hover:bg-surface-2">
+                    <Link href={`/control/rumours/${c.id}`} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 transition-colors duration-200 hover:bg-surface-2">
                       <div className="min-w-0">
                         <p className="font-semibold">{c.claim}</p>
                         <p className="text-sm text-muted">
@@ -89,7 +89,7 @@ export default async function Overview() {
               <ul className="divide-y divide-line">
                 {recent.map((c) => (
                   <li key={c.id}>
-                    <Link href={`/rumours/${c.id}`} className="flex items-center justify-between gap-4 px-5 py-4 transition-colors duration-200 hover:bg-surface-2">
+                    <Link href={`/control/rumours/${c.id}`} className="flex items-center justify-between gap-4 px-5 py-4 transition-colors duration-200 hover:bg-surface-2">
                       <div className="min-w-0">
                         <p className="truncate font-semibold">{c.claim}</p>
                         <p className="text-sm text-muted">{c.pu ?? titleCase(c.ward ?? "")}{c.publishedAt ? `, ${timeAgo(c.publishedAt)}` : ""}</p>

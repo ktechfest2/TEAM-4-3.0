@@ -5,19 +5,19 @@ import { usePathname } from "next/navigation";
 import { motion } from "motion/react";
 
 const ITEMS = [
-  { href: "/", label: "Overview" },
-  { href: "/situation", label: "Situation board" },
-  { href: "/rumours", label: "Rumours" },
-  { href: "/voters", label: "Voter list" },
-  { href: "/officials", label: "Officials" },
-  { href: "/units", label: "Polling units" },
-  { href: "/calls", label: "Calls" },
-  { href: "/settings", label: "Settings" },
+  { href: "/control", label: "Overview" },
+  { href: "/control/situation", label: "Situation board" },
+  { href: "/control/rumours", label: "Rumours" },
+  { href: "/control/voters", label: "Voter list" },
+  { href: "/control/officials", label: "Officials" },
+  { href: "/control/units", label: "Polling units" },
+  { href: "/control/calls", label: "Calls" },
+  { href: "/control/settings", label: "Settings" },
 ] as const;
 
 export function Nav({ openCases }: { openCases: number }) {
   const path = usePathname();
-  const active = (href: string) => (href === "/" ? path === "/" : path.startsWith(href));
+  const active = (href: string) => (href === "/control" ? path === "/control" : path.startsWith(href));
   return (
     <nav aria-label="Control room" className="flex gap-1 overflow-x-auto lg:flex-col lg:overflow-visible">
       {ITEMS.map((it) => {
@@ -32,7 +32,7 @@ export function Nav({ openCases }: { openCases: number }) {
           >
             {on && <motion.span layoutId="nav-pill" className="absolute inset-0 rounded-[6px] bg-accent" transition={{ type: "spring", duration: 0.35, bounce: 0.1 }} />}
             <span className="relative">{it.label}</span>
-            {it.href === "/rumours" && openCases > 0 && (
+            {it.href === "/control/rumours" && openCases > 0 && (
               <span className="relative rounded-full px-2 text-xs font-bold leading-5" style={{ background: on ? "var(--accent-ink)" : "var(--warn)", color: on ? "var(--accent)" : "var(--surface)" }}>
                 {openCases}
               </span>

@@ -3,10 +3,10 @@ import { redirect } from "next/navigation";
 import { LoginForm } from "./form";
 import { getSessionUser } from "@/lib/server/session";
 
-export const metadata: Metadata = { title: "Sign in" };
+export const metadata: Metadata = { title: "Control room sign in", robots: { index: false, follow: false } };
 
 export default async function Login() {
-  if (await getSessionUser()) redirect("/");
+  if (await getSessionUser()) redirect("/control");
   return (
     <main className="grid min-h-screen lg:grid-cols-[1.3fr_1fr]">
       <section className="relative flex flex-col justify-between overflow-hidden bg-ink px-6 py-8 text-ground sm:px-12 sm:py-12">

@@ -13,7 +13,7 @@ const STATUS_TONE = { pending: "neutral", calling: "ink", answered: "good", no_a
 const STATUS_LABEL = { pending: "Queued", calling: "On the phone", answered: "Answered", no_answer: "No answer", skipped: "Simulated (demo contact)", failed: "Call failed" } as const;
 const ALERT_LABEL: Record<string, string> = { pending: "Queued", calling: "Calling", delivered: "Delivered", heard: "Heard and confirmed", no_answer: "No answer", skipped: "Not dialled", failed: "Failed" };
 
-export default async function RumourDetail({ params }: PageProps<"/rumours/[id]">) {
+export default async function RumourDetail({ params }: PageProps<"/control/rumours/[id]">) {
   const { id } = await params;
   const [data, user] = await Promise.all([getCase(id), requireUser()]);
   if (!data) notFound();
@@ -23,7 +23,7 @@ export default async function RumourDetail({ params }: PageProps<"/rumours/[id]"
 
   return (
     <Page>
-      <Link href="/rumours" className="link-u text-sm font-semibold text-muted">Back to rumours</Link>
+      <Link href="/control/rumours" className="link-u text-sm font-semibold text-muted">Back to rumours</Link>
       <header className="mb-8 mt-3 grid gap-6 lg:grid-cols-[1fr_auto] lg:items-start">
         <div>
           <div className="flex flex-wrap items-center gap-2 text-sm text-muted">
