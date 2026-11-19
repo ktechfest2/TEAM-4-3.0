@@ -78,3 +78,21 @@ Researched 2026-11-18. Each claim has a source link. Items marked **UNVERIFIED**
   - [Indigenius](https://indigenius.ai/): streaming plus SIP/Twilio, Hausa and Yoruba, Igbo "coming soon".
   - [9jaLingo](https://www.9jalingo.org/): streaming TTS/STT for ha, ig, yo and Pidgin.
   - [Maraba/Orinode](https://maraba.ai/blog/voice-to-text-nigeria/): STT trained on telephone audio, with code-switching.
+
+## 9. Real-time speech-to-speech alternatives (2026-11-19)
+
+**Google Gemini Live API** ([capabilities](https://aistudio.google.com/docs/live-api/capabilities), [overview](https://aistudio.google.com/docs/live-api)). The Live API is "in preview".
+- **Models:** `gemini-3.8-live` (native audio, default) and `gemini-3.8-live-extended-thinking`. Older ones are `gemini-3.1-flash-live-preview` and `gemini-2.5-flash-native-audio-preview-12-2025`.
+- **Languages:** the language table lists **Yoruba (`yo`) and Hausa (`ha`)**. **Igbo and Nigerian Pidgin are not listed.** Native-audio models pick the language automatically, and you can restrict it through system instructions. (The table came from a model summary of the page tail, so it needs re-checking.)
+- **Tools:** function calling works during a session (`gemini-3.8-live` supports async `NON_BLOCKING` plus scheduling `SILENT|WHEN_IDLE|INTERRUPTED`).
+- **Audio:** the transport is a stateful WSS connection. Input is 16-bit PCM at 16 kHz, output 16-bit PCM at 24 kHz. **There is no μ-law/8 kHz option**, so our bridge resamples to and from Telnyx (Telnyx media streaming supports 16 kHz L16).
+- **Limits:** an audio-only session lasts about 15 minutes (session resumption extends it). VAD silence of 500–800 ms is recommended.
+- **TTS:** `gemini-3.8-flash-tts` lists **Hausa and Igbo** (not Yoruba) and outputs `audio/mulaw`. It is not a Live model.
+- **STT:** Chirp 3 STT lists `ha-NG` and `yo-NG` (Preview), with no Igbo. → [Chirp 3](https://docs.cloud.google.com/speech-to-text/docs/models/chirp-3)
+
+**OpenAI Realtime** ([gpt-realtime-2](https://developers.openai.com/api/docs/models/gpt-realtime-2), [realtime guide](https://developers.openai.com/api/docs/guides/realtime), [SIP](https://developers.openai.com/api/docs/guides/voice-sip?api=live))
+- **Models:** `gpt-realtime-2.1` is the newest and supports tool use. Audio costs $32 per 1M input tokens and $64 per 1M output tokens. `gpt-realtime-translate` (70+ input languages, 13 output languages) and `gpt-realtime-whisper`/`gpt-live-transcribe` cost $0.017/min.
+- **Telephony:** native SIP (`sip:$PROJECT_ID@sip.api.openai.com;transport=tls`, SRTP required) and G.711 μ-law/A-law over WebSocket.
+- **Languages:** **Yoruba, Hausa, Igbo and Pidgin are not named anywhere in the docs.** Support is unknown and needs testing.
+
+**Aethex workarounds.** No plan unlocks local languages. They are gated as "enterprise", not by tier (Hobby, Starter and Builder only differ in credits). BYO-LLM doesn't help because Aethex still owns STT/TTS. The only workaround on our plan is **Pidgin through the prompt** on an English agent with a Nigerian voice.
