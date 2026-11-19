@@ -18,4 +18,5 @@ WORKDIR /app
 COPY --from=build /app /app
 USER node
 EXPOSE 3100
-CMD ["sh", "-c", "cd apps/web && npx next start --port ${PORT:-3100} --hostname 0.0.0.0"]
+# If ADMIN_EMAIL and ADMIN_PASSWORD are set (Railway secrets), ensure that control-room admin exists before starting.
+CMD ["sh", "-c", "cd apps/web && if [ -n \"$ADMIN_EMAIL\" ] && [ -n \"$ADMIN_PASSWORD\" ]; then npx tsx scripts/create-admin.mts \"$ADMIN_EMAIL\" admin; fi && npx next start --port ${PORT:-3100} --hostname 0.0.0.0"]
