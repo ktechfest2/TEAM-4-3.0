@@ -5,13 +5,14 @@ import { createDb, createPhoneCrypto, migrateDb, QUEUES, seed, type DbHandle, ty
 import { AethexClient } from "../src/aethex/client.ts";
 import type { Config } from "../src/config.ts";
 import type { AppDeps, JobQueue, SendOptions } from "../src/context.ts";
-import { handleAlertGoNow, handleAlertNotice } from "../src/workers/alerts.ts";
+import { handleAlertGoNow, handleAlertNotice, handleAlertTransfer } from "../src/workers/alerts.ts";
 import { handleAlertCase, handleCaseAggregate, handleCaseVerify, overrideVerdict } from "../src/workers/cases.ts";
 import { handleDial } from "../src/workers/dial.ts";
 import { handleSweepLateness } from "../src/workers/sweep.ts";
 import { handleWebhook } from "../src/workers/webhook.ts";
 
-export const TEAM = ["+12025550101", "+12025550102"]; // fictional 555-01xx numbers, never real phones
+// fictional 555-01xx numbers, never real phones: TEAM[0] = presiding officer at Ojuelegba I, TEAM[1..2] = voters at Ojuelegba I
+export const TEAM = ["+12025550101", "+12025550102", "+12025550103"];
 export const OUR_NUMBER = "+18648089401";
 export const TOOL_KEY = "test-tool-key-0123456789abcdef0123";
 export const WEBHOOK_SECRET = "whsec_test_secret";
@@ -62,6 +63,7 @@ export async function runJob(deps: AppDeps, name: string, data: any) {
     case QUEUES.alertCase: return handleAlertCase(deps, data);
     case QUEUES.alertNotice: return handleAlertNotice(deps, data);
     case QUEUES.alertGoNow: return handleAlertGoNow(deps, data);
+    case QUEUES.alertTransfer: return handleAlertTransfer(deps, data);
     case QUEUES.dial: return handleDial(deps, data);
     case QUEUES.webhook: return handleWebhook(deps, data);
     case QUEUES.sweepLateness: return handleSweepLateness(deps);
@@ -165,7 +167,7 @@ export async function resetDb(env: TestEnv): Promise<void> {
   await env.handle.db.execute(sql`
     truncate table alert, outbound_attempt, call, webhook_event, report, verification_request, fact, claim_case,
       checkin, notice, subscription, role, person, polling_unit, ward, system_settings, admin_user restart identity cascade`);
-  await seed(env.handle.db, env.crypto, { teamPhones: TEAM, officialPin: OFFICIAL_PIN });
+  await seed(env.handle.db, env.crypto, { officialPhones: [TEAM[0]!], voterPhones: [TEAM[1]!, TEAM[2]!], officialPin: OFFICIAL_PIN });
   env.jobs.jobs = [];
   env.aethex.triggered = [];
 }

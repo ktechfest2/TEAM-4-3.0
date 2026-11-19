@@ -2,18 +2,18 @@ import { createDb } from "./client.ts";
 import { createPhoneCrypto } from "./phone.ts";
 import { seed } from "./seed-lib.ts";
 
-const teamPhones = (process.env.DEMO_TEAM_PHONES ?? "")
-  .split(",")
-  .map((s) => s.trim())
-  .filter(Boolean);
+const list = (v: string | undefined) => (v ?? "").split(",").map((s) => s.trim()).filter(Boolean);
 
 const handle = createDb(process.env.DATABASE_URL, { max: 2, statementTimeoutMs: 60_000 });
 try {
-  const result = await seed(handle.db, createPhoneCrypto(), { teamPhones, officialPin: process.env.DEMO_OFFICIAL_PIN });
-  console.log(`seeded: ${result.wards} wards, ${result.pollingUnits} polling units, ${result.people} people (${teamPhones.length} team phones)`);
-  if (result.generatedOfficialPin) {
-    console.log(`team official PIN (shown once, set DEMO_OFFICIAL_PIN to choose your own): ${result.generatedOfficialPin}`);
-  }
+  const r = await seed(handle.db, createPhoneCrypto(), {
+    officialPhones: list(process.env.DEMO_OFFICIAL_PHONES),
+    voterPhones: list(process.env.DEMO_VOTER_PHONES),
+    officialPin: process.env.DEMO_OFFICIAL_PIN,
+  });
+  console.log(`seeded: ${r.wards} wards, ${r.pollingUnits} polling units, ${r.people} people; retired ${r.retiredDemoContacts} demo contacts`);
+  for (const c of r.created) console.log(`  created ${c}`);
+  if (r.generatedOfficialPin) console.log(`official PIN (shown once; set DEMO_OFFICIAL_PIN to choose): ${r.generatedOfficialPin}`);
 } finally {
   await handle.close();
 }

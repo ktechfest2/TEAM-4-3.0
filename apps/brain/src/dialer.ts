@@ -39,7 +39,7 @@ const AGENT_FOR: Record<DialJob["purpose"], "verifier" | "alert" | "official"> =
 };
 
 /** Purposes that are not urgent and so respect quiet hours outside election day. */
-const QUIET_HOURS_PURPOSES = new Set<DialJob["purpose"]>(["notice_alert", "go_now"]);
+const QUIET_HOURS_PURPOSES = new Set<DialJob["purpose"]>(["go_now"]); // INEC-issued notices are deliberate and go out immediately
 const COOLDOWN_MS = 2 * 60_000;
 
 export interface DialOutcome {
@@ -89,10 +89,6 @@ export async function dial(deps: AppDeps, req: DialRequest): Promise<DialOutcome
     return skip("skipped_no_phone");
   }
   if (p.isDemo || isDemoNumber(e164)) return skip("skipped_demo_contact");
-  if (deps.config.DEMO_MODE) {
-    const allow = new Set(deps.config.DEMO_TEAM_PHONES.map((n) => normalizePhone(n)));
-    if (!allow.has(e164)) return skip("skipped_not_allowlisted");
-  }
   if (QUIET_HOURS_PURPOSES.has(req.purpose) && !settings?.electionDay && settings && inWindow(now, deps.config.ELECTION_TZ, settings.quietStart, settings.quietEnd)) {
     return skip("skipped_quiet_hours");
   }

@@ -7,10 +7,11 @@ import {
   subscription,
   type AlertGoNowJob,
   type AlertNoticeJob,
+  type AlertTransferJob,
   type DialJob,
 } from "@confam/db";
 import type { AppDeps } from "../context.ts";
-import { goNowScript, relocationScript } from "../domain/scripts.ts";
+import { goNowScript, relocationScript, transferScript } from "../domain/scripts.ts";
 
 const DIAL_OPTS = { retryLimit: 3, retryDelay: 20, retryBackoff: true } as const;
 
@@ -24,7 +25,7 @@ export async function handleAlertNotice(deps: AppDeps, job: AlertNoticeJob): Pro
   const subs = await deps.db
     .select({ personId: subscription.personId })
     .from(subscription)
-    .where(and(eq(subscription.puId, n.puId), eq(subscription.active, true)));
+    .where(and(eq(subscription.puId, n.puId), eq(subscription.active, true), eq(subscription.kind, "voter")));
   if (subs.length === 0) return;
   const rows = await deps.db
     .insert(alert)
@@ -57,4 +58,20 @@ export async function handleAlertGoNow(deps: AppDeps, job: AlertGoNowJob): Promi
     await deps.jobs.send(QUEUES.dial, { purpose: "go_now", personId: r.personId, refId: pu.id, rowId: r.id, attempt: 1 } satisfies DialJob, DIAL_OPTS);
   }
   deps.log.info({ puId: pu.id, alerts: rows.length }, "go-now alerts queued");
+}
+
+/** INEC moved ONE voter to a different polling unit from the control room: call that voter immediately. */
+export async function handleAlertTransfer(deps: AppDeps, job: AlertTransferJob): Promise<void> {
+  const [from] = await deps.db.select().from(pollingUnit).where(eq(pollingUnit.id, job.fromPuId));
+  const [to] = await deps.db.select().from(pollingUnit).where(eq(pollingUnit.id, job.toPuId));
+  if (!from || !to) return;
+  const script = transferScript({ fromPu: from.name, toPu: to.name, toAddress: to.address, landmark: to.landmark });
+  const [row] = await deps.db
+    .insert(alert)
+    .values({ kind: "transfer", refId: job.transferId, personId: job.personId, scriptEn: script.en, scriptPcm: script.pcm })
+    .onConflictDoNothing()
+    .returning({ id: alert.id });
+  if (!row) return;
+  await deps.jobs.send(QUEUES.dial, { purpose: "notice_alert", personId: job.personId, refId: job.transferId, rowId: row.id, attempt: 1 } satisfies DialJob, DIAL_OPTS);
+  deps.log.info({ personId: job.personId, transferId: job.transferId }, "voter transfer alert queued");
 }

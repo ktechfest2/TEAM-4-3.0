@@ -88,7 +88,7 @@ export async function handleWebhook(deps: AppDeps, job: WebhookJob): Promise<voi
       await deps.db.update(alert).set({ status: "delivered" }).where(eq(alert.id, a.id));
     } else if (a.attempts < MAX_ATTEMPTS) {
       await deps.db.update(alert).set({ status: "pending" }).where(eq(alert.id, a.id));
-      const purpose = a.kind === "case" ? "case_alert" : a.kind === "notice" ? "notice_alert" : "go_now";
+      const purpose = a.kind === "case" ? "case_alert" : a.kind === "go_now" ? "go_now" : "notice_alert";
       await deps.jobs.send(QUEUES.dial, { purpose, personId: a.personId, refId: a.refId, rowId: a.id, attempt: a.attempts + 1 } satisfies DialJob, { startAfter: RETRY_DELAY_S });
     } else {
       await deps.db.update(alert).set({ status: "no_answer" }).where(eq(alert.id, a.id));

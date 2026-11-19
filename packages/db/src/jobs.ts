@@ -6,6 +6,7 @@ export const QUEUES = {
   alertCase: "alert-case",
   alertNotice: "alert-notice",
   alertGoNow: "alert-go-now",
+  alertTransfer: "alert-transfer",
   dial: "dial",
   sweepLateness: "sweep-lateness",
   webhook: "webhook-aethex",
@@ -19,6 +20,7 @@ export interface CaseOverrideJob { caseId: string; verdict: "confirmed" | "false
 export interface AlertCaseJob { caseId: string; correction?: boolean }
 export interface AlertNoticeJob { noticeId: string }
 export interface AlertGoNowJob { puId: string }
+export interface AlertTransferJob { personId: string; fromPuId: string; toPuId: string; transferId: string }
 export interface DialJob {
   purpose: "verify" | "case_alert" | "notice_alert" | "go_now" | "late_official" | "late_supervisor";
   personId: string;

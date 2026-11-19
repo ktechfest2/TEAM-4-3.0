@@ -1,4 +1,4 @@
-import { and, eq, isNull, ne, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import {
   alert,
   claimCase,
@@ -64,19 +64,26 @@ export async function handleCaseVerify(deps: AppDeps, job: CaseVerifyJob): Promi
   const reporters = await deps.db.select({ personId: report.personId }).from(report).where(eq(report.caseId, c.id));
   const exclude = new Set(reporters.map((r) => r.personId).filter(Boolean) as string[]);
 
-  const load = async (wardOnly: boolean) =>
-    deps.db
-      .select({ roleId: role.id, personId: role.personId, affiliation: role.affiliation, reputation: role.reputation, wardId: role.wardId })
-      .from(role)
-      .innerJoin(person, eq(person.id, role.personId))
-      .where(and(eq(role.kind, "verifier"), isNull(person.deletedAt), wardOnly ? eq(role.wardId, c.wardId!) : ne(role.wardId, c.wardId!)));
+  const candidates = async (kind: "official" | "verifier", scope: "pu" | "ward" | "lga") =>
+    (
+      await deps.db
+        .select({ roleId: role.id, personId: role.personId, affiliation: role.affiliation, reputation: role.reputation })
+        .from(role)
+        .innerJoin(person, eq(person.id, role.personId))
+        .where(
+          and(
+            eq(role.kind, kind),
+            isNull(person.deletedAt),
+            scope === "pu" ? (c.puId ? eq(role.puId, c.puId) : sql`false`) : scope === "ward" ? eq(role.wardId, c.wardId!) : ne(role.wardId, c.wardId!),
+          ),
+        )
+    ).filter((v) => !exclude.has(v.personId));
 
-  const local = (await load(true)).filter((v) => !exclude.has(v.personId));
-  let chosen = pickVerifiers(local, MAX_VERIFIERS);
-  if (chosen.length < 2) {
-    const wider = (await load(false)).filter((v) => !exclude.has(v.personId) && !chosen.some((x) => x.personId === v.personId));
-    chosen = [...chosen, ...pickVerifiers(wider, MAX_VERIFIERS - chosen.length)];
-  }
+  // Officials at the polling unit are the authoritative source; then officials in the ward; then (legacy) community verifiers.
+  let chosen = pickVerifiers(await candidates("official", "pu"), MAX_VERIFIERS);
+  if (chosen.length === 0) chosen = pickVerifiers(await candidates("official", "ward"), MAX_VERIFIERS);
+  if (chosen.length === 0) chosen = pickVerifiers([...(await candidates("verifier", "ward")), ...(await candidates("verifier", "lga"))], MAX_VERIFIERS);
+  if (chosen.length === 0) chosen = pickVerifiers(await candidates("official", "lga"), 2);
 
   for (const v of chosen) {
     const [row] = await deps.db
@@ -89,8 +96,22 @@ export async function handleCaseVerify(deps: AppDeps, job: CaseVerifyJob): Promi
     await deps.jobs.send(QUEUES.dial, dialJob, { retryLimit: 3, retryDelay: 20, retryBackoff: true });
   }
   await notify(deps.pool, { type: "case", id: c.id });
-  deps.log.info({ caseId: c.id, verifiers: chosen.length }, "verification started");
+  deps.log.info({ caseId: c.id, asked: chosen.length }, "verification started");
   if (chosen.length === 0) await deps.jobs.send(QUEUES.caseAggregate, { caseId: c.id, reason: "answer" } satisfies CaseAggregateJob);
+}
+
+/** Human description of who settled a verdict, e.g. "the presiding officer at Ojuelegba Primary School I". */
+async function sourceLabel(deps: AppDeps, roleIds: string[]): Promise<string | null> {
+  if (roleIds.length === 0) return null;
+  const rows = await deps.db
+    .select({ kind: role.kind, pu: pollingUnit.name })
+    .from(role)
+    .leftJoin(pollingUnit, eq(pollingUnit.id, role.puId))
+    .where(inArray(role.id, roleIds));
+  const officials = rows.filter((r) => r.kind === "official");
+  if (officials.length === rows.length && officials.length === 1) return `the presiding officer at ${officials[0]!.pu ?? "the polling unit"}`;
+  if (officials.length === rows.length) return `${officials.length} polling officials at the location`;
+  return null;
 }
 
 /**
@@ -120,11 +141,15 @@ export async function handleCaseAggregate(deps: AppDeps, job: CaseAggregateJob):
     if (!result.final || !result.verdict) return null;
 
     const label = await placeLabel(deps, c.wardId, c.puId);
-    const script = verdictScript({ verdict: result.verdict, category: c.category as Category, claimEn: c.claimEn, place: label, yes: result.yes, no: result.no });
+    const winning = result.verdict === "confirmed" ? "yes" : result.verdict === "false" ? "no" : null;
+    const source = winning ? await sourceLabel(deps, reqs.filter((r) => r.status === "answered" && r.answer === winning).map((r) => r.roleId)) : null;
+    const script = verdictScript({ verdict: result.verdict, category: c.category as Category, claimEn: c.claimEn, place: label, yes: result.yes, no: result.no, source });
     const basis =
       result.verdict === "unverified"
-        ? `Not enough agreement by the deadline (yes ${result.yes}, no ${result.no}, unknown ${result.unknown}, ${reqs.length} verifiers asked).`
-        : `${result.verdict === "confirmed" ? result.yes : result.no} independent verifiers agreed (yes ${result.yes}, no ${result.no}, unknown ${result.unknown}).`;
+        ? reqs.length === 0
+          ? "No official or verifier is registered for this place, so it could not be checked."
+          : `No clear answer by the deadline (yes ${result.yes}, no ${result.no}, unknown ${result.unknown}, ${reqs.length} asked).`
+        : `${source ? source.charAt(0).toUpperCase() + source.slice(1) : `${result.verdict === "confirmed" ? result.yes : result.no} independent verifiers`} answered ${winning} (yes ${result.yes}, no ${result.no}, unknown ${result.unknown}).`;
 
     await tx
       .update(claimCase)
@@ -176,7 +201,7 @@ export async function handleAlertCase(deps: AppDeps, job: AlertCaseJob): Promise
       .select({ personId: subscription.personId })
       .from(subscription)
       .innerJoin(pollingUnit, eq(pollingUnit.id, subscription.puId))
-      .where(and(eq(subscription.active, true), eq(pollingUnit.wardId, c.wardId)));
+      .where(and(eq(subscription.active, true), eq(subscription.kind, "voter"), eq(pollingUnit.wardId, c.wardId)));
     for (const s of subs) recipients.add(s.personId);
   }
 
@@ -211,7 +236,7 @@ export async function overrideVerdict(
     const yes = reqs.filter((r) => r.answer === "yes").length;
     const no = reqs.filter((r) => r.answer === "no").length;
     const label = await placeLabel(deps, c.wardId, c.puId);
-    const script = verdictScript({ verdict: input.verdict, category: c.category as Category, claimEn: c.claimEn, place: label, yes: Math.max(yes, 2), no: Math.max(no, 2) });
+    const script = verdictScript({ verdict: input.verdict, category: c.category as Category, claimEn: c.claimEn, place: label, yes: Math.max(yes, 1), no: Math.max(no, 1), source: "INEC" });
     await tx.update(fact).set({ supersededAt: now }).where(and(eq(fact.caseId, c.id), isNull(fact.supersededAt)));
     await tx
       .update(claimCase)

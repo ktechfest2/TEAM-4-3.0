@@ -19,6 +19,7 @@ import type { AppDeps } from "../context.ts";
 import { findMatchingFact, findOpenCase } from "../domain/matching.ts";
 import { resolvePlace, searchPollingUnits } from "../domain/places.ts";
 import { CATEGORIES, placeName, type Category } from "../domain/scripts.ts";
+import { startOfLocalDay } from "../time.ts";
 import { ensurePerson, findPersonByPhone, type PersonRow } from "../people.ts";
 import type { CallParty } from "./caller.ts";
 
@@ -59,33 +60,76 @@ async function caller(call: ToolCall, deps: AppDeps): Promise<PersonRow | null> 
 
 const UNKNOWN_CALLER_SAY = "I can't see the caller's number on this line, so I can't save this. Ask them to call from their own phone.";
 
+export type CallerType = "official" | "voter" | "public";
+
+async function callerProfile(call: ToolCall, deps: AppDeps) {
+  const p = await caller(call, deps);
+  if (!p) return { person: null, type: "public" as CallerType, officialPu: null as string | null, voterPu: null as null | { id: string; name: string; code: string; address: string; landmark: string | null; status: string; relocatedToId: string | null } };
+  const [official] = await deps.db
+    .select({ puName: pollingUnit.name })
+    .from(role)
+    .leftJoin(pollingUnit, eq(pollingUnit.id, role.puId))
+    .where(and(eq(role.personId, p.id), eq(role.kind, "official")))
+    .limit(1);
+  const [voter] = await deps.db
+    .select({ id: pollingUnit.id, name: pollingUnit.name, code: pollingUnit.code, address: pollingUnit.address, landmark: pollingUnit.landmark, status: pollingUnit.status, relocatedToId: pollingUnit.relocatedToId })
+    .from(subscription)
+    .innerJoin(pollingUnit, eq(pollingUnit.id, subscription.puId))
+    .where(and(eq(subscription.personId, p.id), eq(subscription.active, true), eq(subscription.kind, "voter")))
+    .limit(1);
+  const type: CallerType = official ? "official" : voter ? "voter" : "public";
+  return { person: p, type, officialPu: official?.puName ?? null, voterPu: voter ?? null };
+}
+
 export const identifyCaller = define({
   name: "identify_caller",
   description:
-    "Call this at the very start of every call. Returns who the caller is (if known): their name, roles (verifier, official, supervisor), the polling unit they subscribed to, and preferred language.",
+    "Call this at the very start of every call. Returns caller_type: 'official' (a registered presiding officer), 'voter' (on the INEC voter list, with their polling unit) or 'public' (anyone else), plus their name if known.",
   agents: ["hotline", "official", "verifier", "alert"],
   schema: z.object({}),
   async handler(_args, call, deps) {
-    const p = await caller(call, deps);
-    if (!p) return { known: false, say: "New caller. Greet them warmly and ask how you can help." };
-    const roles = await deps.db
-      .select({ kind: role.kind, puName: pollingUnit.name, puCode: pollingUnit.code })
-      .from(role)
-      .leftJoin(pollingUnit, eq(pollingUnit.id, role.puId))
-      .where(eq(role.personId, p.id));
-    const subs = await deps.db
-      .select({ name: pollingUnit.name, code: pollingUnit.code, needs: subscription.needs })
-      .from(subscription)
-      .innerJoin(pollingUnit, eq(pollingUnit.id, subscription.puId))
-      .where(and(eq(subscription.personId, p.id), eq(subscription.active, true)));
-    const firstName = p.displayName.startsWith("Caller ") ? null : p.displayName;
+    const prof = await callerProfile(call, deps);
+    const p = prof.person;
+    const name = p && !p.displayName.startsWith("Caller ") && !p.displayName.startsWith("Voter ") && !p.displayName.startsWith("Presiding officer") ? p.displayName : null;
+    if (prof.type === "official") {
+      return { caller_type: "official", name, polling_unit: prof.officialPu, say: `This caller is the registered presiding officer for ${prof.officialPu}. They may give a status update (ask for their PIN) or ask questions like anyone else.` };
+    }
+    if (prof.type === "voter") {
+      return { caller_type: "voter", name, polling_unit: prof.voterPu!.name, say: `This caller is on the INEC voter list, registered at ${prof.voterPu!.name}.${name ? ` Their name is ${name}.` : ""}` };
+    }
+    return { caller_type: "public", name, say: "This caller is not on the voter list. They can still ask about rumours, incidents and whether officials have arrived anywhere, and can ask for elderly or disability help." };
+  },
+});
+
+export const myPollingUnit = define({
+  name: "my_polling_unit",
+  description:
+    "Use when the caller asks about THEIR OWN polling unit: where they vote, or whether their polling unit or voting location has changed. Only works for callers on the INEC voter list.",
+  agents: ["hotline"],
+  schema: z.object({}),
+  async handler(_args, call, deps) {
+    const prof = await callerProfile(call, deps);
+    if (prof.type !== "voter" || !prof.voterPu) {
+      return {
+        on_voter_list: false,
+        say: "This number is not on the INEC voter list, so Confam can't tell them their polling unit. Tell them kindly to register or update their details with INEC (at an INEC office or the INEC voter registration website) with this phone number, then Confam will call them if their polling unit ever changes.",
+      };
+    }
+    const pu = prof.voterPu;
+    if (pu.status === "relocated" && pu.relocatedToId) {
+      const [to] = await deps.db.select().from(pollingUnit).where(eq(pollingUnit.id, pu.relocatedToId));
+      if (to) {
+        return {
+          on_voter_list: true,
+          moved: true,
+          say: `Their polling unit ${pu.name} has MOVED to ${to.name}, ${to.address}${to.landmark ? ` (${to.landmark})` : ""}. Tell them clearly to vote at the new place.`,
+        };
+      }
+    }
     return {
-      known: true,
-      name: firstName,
-      language_pref: p.languagePref,
-      roles: roles.map((r) => ({ kind: r.kind, polling_unit: r.puName, polling_unit_code: r.puCode })),
-      subscriptions: subs,
-      say: firstName ? `Known caller: ${firstName}.` : "Returning caller.",
+      on_voter_list: true,
+      moved: false,
+      say: `They are registered to vote at ${pu.name}, ${pu.address}${pu.landmark ? ` (${pu.landmark})` : ""}. It has not changed. Confam will call them if it ever does.`,
     };
   },
 });
@@ -175,6 +219,36 @@ export const reportClaim = define({
     const place = await resolvePlace(deps.db, args.place);
     const area = { wardId: place.wardId, puId: place.pu?.id ?? null };
 
+    // Officials/materials questions about a specific polling unit: the latest official check-in today IS the answer.
+    if (area.puId && (args.category === "officials_absent" || args.category === "materials_missing")) {
+      const [latest] = await deps.db
+        .select({ event: checkin.event, at: checkin.at, eta: checkin.etaMinutes, note: checkin.note })
+        .from(checkin)
+        .where(and(eq(checkin.puId, area.puId), gte(checkin.at, startOfLocalDay(now, deps.config.ELECTION_TZ))))
+        .orderBy(desc(checkin.at))
+        .limit(1);
+      const tz = deps.config.ELECTION_TZ;
+      const puName = place.pu!.name;
+      if (latest) {
+        const at = fmtTime(latest.at, tz);
+        const arrivedEvents = args.category === "officials_absent" ? ["arrived", "materials_received", "voting_started", "closed"] : ["materials_received", "voting_started", "closed"];
+        if (arrivedEvents.includes(latest.event)) {
+          return {
+            status: "known",
+            verdict: "false",
+            say: `Verified by the presiding officer's own check-in: at ${puName}, ${latest.event === "voting_started" ? "voting started" : latest.event === "materials_received" ? "voting materials arrived" : latest.event === "closed" ? "voting has closed" : "the officials arrived"} at ${at}. So the report is not true. Tell the caller in their language.`,
+          };
+        }
+        if (latest.event === "delay") {
+          return {
+            status: "known",
+            verdict: "confirmed",
+            say: `Verified by the presiding officer at ${puName}: they reported a delay at ${at}${latest.eta ? `, expected in about ${latest.eta} minutes` : ""}${latest.note ? ` (${latest.note})` : ""}. Tell the caller in their language.`,
+          };
+        }
+      }
+    }
+
     const fact = await findMatchingFact(deps.db, args.claim_en, args.category, area, now);
     if (fact) {
       return {
@@ -235,41 +309,7 @@ export const reportClaim = define({
       status: "checking",
       case_id: caseId,
       place: place.label,
-      say: "Not yet verified. Tell the caller Confam is checking with trusted people at that place right now and will call them back on this number within about 10 minutes. If anyone is in danger, tell them to move to safety and call 112.",
-    };
-  },
-});
-
-export const subscribe = define({
-  name: "subscribe",
-  description:
-    "Register the caller for Confam alerts about their polling unit (relocation, verified rumours, officials' arrival). Only call after the caller clearly agrees to receive calls from Confam (consent must be true). Include any accessibility needs.",
-  agents: ["hotline"],
-  schema: z.object({
-    polling_unit: z.string().min(2).max(200),
-    consent: z.literal(true).describe("Caller explicitly agreed to receive calls"),
-    needs: z.array(z.enum(NEEDS)).max(6).default([]),
-    language: z.enum(LANGS).optional().describe("Language the caller spoke"),
-  }),
-  async handler(args, call, deps) {
-    if (!call.party.phone) return { ok: false, say: UNKNOWN_CALLER_SAY };
-    const [pu] = await searchPollingUnits(deps.db, args.polling_unit, 1);
-    if (!pu) return { ok: false, say: "I couldn't find that polling unit. Ask for the school or place name, or a nearby landmark." };
-    const p = await ensurePerson(deps.db, deps.crypto, call.party.phone);
-    await deps.db
-      .update(person)
-      .set({ consentAt: new Date(), languagePref: args.language ?? p.languagePref })
-      .where(eq(person.id, p.id));
-    await deps.db
-      .insert(subscription)
-      .values({ personId: p.id, puId: pu.id, needs: args.needs })
-      .onConflictDoUpdate({ target: [subscription.personId, subscription.puId], set: { needs: args.needs, active: true } });
-    await notify(deps.pool, { type: "person", id: p.id });
-    const access = args.needs.length > 0;
-    return {
-      ok: true,
-      polling_unit: pu.name,
-      say: `Subscribed to ${pu.name}. Confam will call if it moves, if there's verified news about it, ${access ? "and when the officials have arrived so they can go and vote. " : "and on election morning. "}Tell them they can say 'stop calls' anytime.`,
+      say: "Not yet verified. Tell the caller Confam is checking with the officials at that place right now and will call them back on this number within about 10 minutes. If anyone is in danger, tell them to move to safety and call 112.",
     };
   },
 });
@@ -292,24 +332,40 @@ export const unsubscribe = define({
 export const requestAccessibilitySupport = define({
   name: "request_accessibility_support",
   description:
-    "For elderly voters or voters with a disability. Records their needs for their polling unit, alerts the officials there, and returns their legal rights to explain. Only call after the caller agrees to receive a call when officials arrive (consent).",
+    "For elderly voters or voters with a disability (or someone calling for them). Anyone can use this. Records their needs for their polling unit, alerts the officials there, and returns their legal rights to explain. Only call after the caller agrees that Confam can call them back when officials arrive (consent).",
   agents: ["hotline"],
   schema: z.object({
     polling_unit: z.string().min(2).max(200),
     needs: z.array(z.enum(NEEDS)).min(1).max(6),
     consent: z.literal(true),
+    language: z.enum(LANGS).optional().describe("Language the caller spoke"),
   }),
   async handler(args, call, deps) {
-    const res = await subscribe.handler({ polling_unit: args.polling_unit, consent: true, needs: args.needs }, call, deps);
-    if (!res.ok) return res;
+    if (!call.party.phone) return { ok: false, say: UNKNOWN_CALLER_SAY };
+    const [pu] = await searchPollingUnits(deps.db, args.polling_unit, 1);
+    if (!pu) return { ok: false, say: "I couldn't find that polling unit. Ask for the school or place name, or a nearby landmark." };
+    const p = await ensurePerson(deps.db, deps.crypto, call.party.phone);
+    await deps.db.update(person).set({ consentAt: new Date(), languagePref: args.language ?? p.languagePref }).where(eq(person.id, p.id));
+    const [existing] = await deps.db
+      .select({ id: subscription.id, kind: subscription.kind })
+      .from(subscription)
+      .where(and(eq(subscription.personId, p.id), eq(subscription.puId, pu.id)))
+      .limit(1);
+    if (existing) {
+      await deps.db.update(subscription).set({ needs: args.needs, active: true, goNowSentAt: null }).where(eq(subscription.id, existing.id));
+    } else {
+      await deps.db.insert(subscription).values({ personId: p.id, puId: pu.id, needs: args.needs, kind: "assistance" });
+    }
+    await notify(deps.pool, { type: "person", id: p.id });
     return {
       ok: true,
+      polling_unit: pu.name,
       rights: [
         "Priority access: elderly voters and persons with disability should not queue (INEC Regulations, para 25).",
         "You may bring a person of your choice into the voting booth to help you; a party agent or candidate cannot be your helper (Electoral Act 2026, s.54(1)).",
         "INEC must provide reasonable help such as braille ballot guides, magnifiers, or sign language (s.54(2)).",
       ],
-      say: `Saved. Explain these rights simply: they don't need to queue; they can bring a helper they trust (not a party agent); INEC should provide aids like braille guides or magnifiers. Confam will tell the officials at ${res.polling_unit} and will call them when the officials have arrived.`,
+      say: `Saved for ${pu.name}. Explain these rights simply: they don't need to queue; they can bring a helper they trust (not a party agent); INEC should provide aids like braille guides or magnifiers. Confam will tell the presiding officer at ${pu.name} and will call them as soon as the officials have arrived.`,
     };
   },
 });
@@ -423,10 +479,10 @@ export const confirmAlertHeard = define({
 
 export const TOOLS: ToolDef[] = [
   identifyCaller,
+  myPollingUnit,
   lookupPollingUnit,
   puStatus,
   reportClaim,
-  subscribe,
   unsubscribe,
   requestAccessibilitySupport,
   officialCheckin,

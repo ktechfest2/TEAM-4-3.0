@@ -52,21 +52,25 @@ export function verdictScript(params: {
   place: string;
   yes: number;
   no: number;
+  /** who settled it, e.g. "the presiding officer at Ojuelegba Primary School I" or "INEC" */
+  source?: string | null;
 }): Bilingual {
   const { verdict, category, claimEn, place } = params;
   const people = verdict === "confirmed" ? params.yes : params.no;
+  const srcEn = params.source ? (params.source === "INEC" ? "INEC officials told us directly." : `${params.source.charAt(0).toUpperCase()}${params.source.slice(1)} told us directly.`) : `${people} ${people === 1 ? "person" : "people"} at the location told us so directly.`;
+  const srcPcm = params.source ? (params.source === "INEC" ? "INEC officials confam am give us." : `${params.source.replace(/^the /, "The ")} confam am give us.`) : `${people} ${people === 1 ? "person" : "people"} wey dey that place confam am give us.`;
   const safety = category === "violence";
   const claim = claimEn.replace(/[.\s]+$/, "");
   switch (verdict) {
     case "false":
       return {
-        en: `Confam check: the report that "${claim}" around ${place} is not true. ${people} people at the location told us so directly.${safety ? SAFETY_EN : ""}`,
-        pcm: `Confam don check am: the gist say "${claim}" for ${place} no true. ${people} people wey dey that place confam am give us.${safety ? SAFETY_PCM : ""}`,
+        en: `Confam check: the report that "${claim}" around ${place} is not true. ${srcEn}${safety ? SAFETY_EN : ""}`,
+        pcm: `Confam don check am: the gist say "${claim}" for ${place} no true. ${srcPcm}${safety ? SAFETY_PCM : ""}`,
       };
     case "confirmed":
       return {
-        en: `Confam check: the report that "${claim}" around ${place} has been confirmed by ${people} people at the location. Please plan accordingly.${safety ? SAFETY_EN : ""}`,
-        pcm: `Confam don check am: the gist say "${claim}" for ${place} na true. ${people} people wey dey that place confam am. Abeg plan your movement well.${safety ? SAFETY_PCM : ""}`,
+        en: `Confam check: the report that "${claim}" around ${place} is true. ${srcEn} Please plan accordingly.${safety ? SAFETY_EN : ""}`,
+        pcm: `Confam don check am: the gist say "${claim}" for ${place} na true. ${srcPcm} Abeg plan your movement well.${safety ? SAFETY_PCM : ""}`,
       };
     case "unverified":
       return {
@@ -100,4 +104,12 @@ export function goNowScript(p: { pu: string }): Bilingual {
 
 export function verifierQuestion(p: { claimEn: string; place: string }): string {
   return `Is this happening right now around ${p.place}: ${p.claimEn.replace(/[.\s]+$/, "")}?`;
+}
+
+export function transferScript(p: { fromPu: string; toPu: string; toAddress: string; landmark: string | null }): Bilingual {
+  const lm = p.landmark ? ` (${p.landmark})` : "";
+  return {
+    en: `Important notice from Confam on behalf of INEC: your voting location has been changed from ${p.fromPu} to ${p.toPu}, ${p.toAddress}${lm}. Please go and vote at the new location.`,
+    pcm: `Important message from Confam for INEC: dem don change where you go vote. E no be ${p.fromPu} again, na ${p.toPu}, for ${p.toAddress}${lm}. Abeg go vote for the new place.`,
+  };
 }

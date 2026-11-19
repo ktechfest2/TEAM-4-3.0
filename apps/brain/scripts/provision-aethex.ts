@@ -146,6 +146,12 @@ for (const [key, spec] of Object.entries(SPECS) as [AgentKey, Record<string, unk
     else await aethex.createTool(id, def);
     console.log(`  ${ex ? "updated" : "created"} tool ${t.name}`);
   }
+  // Remove tools this agent should no longer have (e.g. after a tool is retired).
+  const wanted = new Set(TOOLS.filter((x) => x.agents.includes(key)).map((x) => x.name));
+  for (const ex of existingTools.filter((x) => !wanted.has(x.name))) {
+    await aethex.request("DELETE", `/agents/${id}/tools/${ex.id}`);
+    console.log(`  removed tool ${ex.name}`);
+  }
 }
 
 updates.AETHEX_AGENT_IDS = JSON.stringify(ids);
