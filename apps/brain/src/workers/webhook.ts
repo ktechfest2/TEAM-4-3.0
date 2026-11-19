@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
-import { alert, call, notify, QUEUES, verificationRequest, type DialJob, type WebhookJob } from "@confam/db";
+import { alert, call, claimCase, notify, QUEUES, report, verificationRequest, type DialJob, type WebhookJob } from "@confam/db";
 import type { AppDeps } from "../context.ts";
 import { findPersonByPhone } from "../people.ts";
 
@@ -19,8 +19,10 @@ const CallEnded = z.object({
   transcript_text: z.string().optional().nullable(),
 });
 
-const RETRY_DELAY_S = 180;
-const MAX_ATTEMPTS = 2;
+const RETRY_DELAY_S = 120; // alerts
+const MAX_ATTEMPTS = 2; // alerts
+const VERIFY_RETRY_DELAY_S = 60;
+const VERIFY_MAX_ATTEMPTS = 3;
 
 function toDate(v: string | number | null | undefined): Date | null {
   if (v === null || v === undefined) return null;
@@ -68,12 +70,20 @@ export async function handleWebhook(deps: AppDeps, job: WebhookJob): Promise<voi
     .returning({ id: call.id });
   await notify(deps.pool, { type: "call", id: row!.id });
 
+  // A reporter just hung up: start checking their rumour now (the official's phone may be the same handset).
+  const reported = await deps.db
+    .select({ caseId: report.caseId })
+    .from(report)
+    .innerJoin(claimCase, eq(claimCase.id, report.caseId))
+    .where(and(eq(report.aethexCallId, e.call_id), eq(claimCase.status, "verifying")));
+  for (const r of reported) await deps.jobs.send(QUEUES.caseVerify, { caseId: r.caseId });
+
   // Verification calls that ended without a recorded answer: retry once, then mark no_answer and re-aggregate.
   const [vr] = await deps.db.select().from(verificationRequest).where(eq(verificationRequest.aethexCallId, e.call_id));
   if (vr && vr.status === "calling") {
-    if (vr.attempts < MAX_ATTEMPTS && !completed) {
+    if (vr.attempts < VERIFY_MAX_ATTEMPTS && !completed) {
       await deps.db.update(verificationRequest).set({ status: "pending" }).where(eq(verificationRequest.id, vr.id));
-      await deps.jobs.send(QUEUES.dial, { purpose: "verify", personId: vr.personId, refId: vr.caseId, rowId: vr.id, attempt: vr.attempts + 1 } satisfies DialJob, { startAfter: RETRY_DELAY_S });
+      await deps.jobs.send(QUEUES.dial, { purpose: "verify", personId: vr.personId, refId: vr.caseId, rowId: vr.id, attempt: vr.attempts + 1 } satisfies DialJob, { startAfter: VERIFY_RETRY_DELAY_S });
     } else {
       await deps.db.update(verificationRequest).set({ status: "no_answer" }).where(eq(verificationRequest.id, vr.id));
       await deps.jobs.send(QUEUES.caseAggregate, { caseId: vr.caseId, reason: "answer" });

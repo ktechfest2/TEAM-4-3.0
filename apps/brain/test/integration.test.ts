@@ -98,6 +98,28 @@ describe("seed upgrade from the first version", () => {
   });
 });
 
+describe("caller number fast path", () => {
+  it("uses the Aethex-filled caller header without looking the call up", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/tools/my_polling_unit",
+      headers: { "content-type": "application/json", "x-confam-tool-key": TOOL_KEY, "x-confam-caller": VOTER_A },
+      payload: { arguments: {}, agent_id: AGENTS.hotline, conversation_id: "co_1", call_id: "ca_not_known_to_aethex" },
+    });
+    expect(res.json()).toMatchObject({ on_voter_list: true });
+  });
+  it("ignores an unfilled template and falls back to the lookup", async () => {
+    const callId = env.aethex.addInbound(VOTER_B);
+    const res = await app.inject({
+      method: "POST",
+      url: "/tools/my_polling_unit",
+      headers: { "content-type": "application/json", "x-confam-tool-key": TOOL_KEY, "x-confam-caller": "{{system__caller_id}}" },
+      payload: { arguments: {}, agent_id: AGENTS.hotline, conversation_id: "co_1", call_id: callId },
+    });
+    expect(res.json()).toMatchObject({ on_voter_list: true });
+  });
+});
+
 describe("who is calling", () => {
   it("identifies officials, voters and the public", async () => {
     expect((await tool("identify_caller", {}, { callId: env.aethex.addInbound(OFFICIAL) })).body.caller_type).toBe("official");
@@ -350,6 +372,18 @@ describe("aethex webhooks", () => {
     await env.jobs.drain(env.deps, [QUEUES.webhook]);
     const retry = env.jobs.jobs.find((j) => j.name === QUEUES.dial);
     expect(retry?.data.attempt).toBe(2);
-    expect(retry?.options?.startAfter).toBe(180);
+    expect(retry?.options?.startAfter).toBe(60);
+  });
+
+  it("starts checking a rumour as soon as the reporter hangs up, and never double-dials the official", async () => {
+    const reporterCall = env.aethex.addInbound(PUBLIC);
+    const r = await tool("report_claim", { claim_en: "Fighting at Ojuelegba", category: "violence", place: "Ojuelegba primary school" }, { callId: reporterCall });
+    const fallback = env.jobs.jobs.find((j) => j.name === QUEUES.caseVerify);
+    expect(fallback?.options?.startAfter).toBe(90); // not while the reporter is still on the line
+    env.jobs.take(QUEUES.caseAggregate);
+    await post({ event_id: "evt_rep", call_id: reporterCall, status: "completed", direction: "inbound", from_number: PUBLIC, to_number: "+18648089401" });
+    await env.jobs.drain(env.deps, [QUEUES.webhook, QUEUES.caseVerify, QUEUES.dial]); // webhook start + fallback start
+    expect(env.aethex.triggered.map((t) => t.to_number)).toEqual([OFFICIAL]);
+    expect(await env.deps.db.select().from(verificationRequest).where(eq(verificationRequest.caseId, r.body.case_id))).toHaveLength(1);
   });
 });

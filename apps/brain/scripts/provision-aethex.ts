@@ -35,7 +35,7 @@ const apiKey = env("AETHEX_API_KEY");
 const brainUrl = env("PUBLIC_BRAIN_URL").replace(/\/$/, "");
 const toolKey = env("CONFAM_TOOL_KEY");
 const aethex = new AethexClient({ apiKey, baseUrl: process.env.AETHEX_BASE_URL, timeoutMs: 30_000 });
-const LLM = process.env.AETHEX_LLM_MODEL ?? "claude-sonnet-4-6";
+const LLM = process.env.AETHEX_LLM_MODEL ?? "claude-haiku-4-5";
 
 const voices = await aethex.listVoices();
 const voice = (name: string) => {
@@ -51,7 +51,7 @@ const common = {
   llm_model: LLM,
   temperature: 0.3,
   interruption_enabled: true,
-  turn_eagerness: "normal",
+  turn_eagerness: "eager",
   response_max_sentences: 2,
   end_call_enabled: true,
   recording_enabled: true,
@@ -138,7 +138,8 @@ for (const [key, spec] of Object.entries(SPECS) as [AgentKey, Record<string, unk
       parameters_schema: toolSchema(t.schema),
       endpoint_url: `${brainUrl}/tools/${t.name}`,
       http_method: "POST",
-      headers: { "x-confam-tool-key": toolKey },
+      // {{system__caller_id}} is filled by Aethex with the other party's number, saving a lookup per call.
+      headers: { "x-confam-tool-key": toolKey, "x-confam-caller": "{{system__caller_id}}" },
       response_mode: "json",
     };
     const ex = existingTools.find((x) => x.name === t.name);

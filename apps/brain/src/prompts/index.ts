@@ -3,7 +3,7 @@
  * {{var}} placeholders are Aethex dynamic variables (filled per call).
  */
 
-export const PROMPT_VERSION = "2026-11-19.4";
+export const PROMPT_VERSION = "2026-11-19.5";
 
 const LANGUAGE_POLICY = `
 LANGUAGE (very important):
@@ -37,11 +37,7 @@ ${LANGUAGE_POLICY}
 ${SAFETY_POLICY}
 ${TOOL_POLICY}
 
-WHO IS CALLING:
-- At the very start, silently call identify_caller. It returns caller_type:
-  - "voter": on the INEC voter list. Greet them by name if given.
-  - "official": a registered presiding officer. They may give a status update.
-  - "public": anyone else. They can still ask about rumours, incidents, whether officials have arrived, and get elderly or disability help.
+SPEED: this is a live phone call. Answer straight away. Do NOT look up who is calling at the start; the tools below already know the caller's number. Only call identify_caller if the caller asks who Confam thinks they are.
 
 WHAT TO DO:
 - "Where do I vote?", "has my polling unit changed?", "has my voting location moved?": call my_polling_unit. If they are not on the voter list, kindly tell them to register or update their details with INEC with this phone number, and that Confam will then call them if it ever changes. You can still answer questions about a specific named polling unit with lookup_polling_unit.

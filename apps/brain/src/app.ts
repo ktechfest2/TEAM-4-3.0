@@ -89,16 +89,23 @@ export async function buildApp(deps: AppDeps, opts: { resolver?: CallerResolver 
 
     const started = Date.now();
     try {
-      const party = await resolver.resolve(env.data.call_id).catch((err) => {
-        req.log.warn({ err, callId: env.data.call_id }, "could not resolve call party");
-        return { phone: null, direction: null } as const;
-      });
+      // Fast path: Aethex fills {{system__caller_id}} (the other party's E.164 number) into our tool header.
+      // It is set by Aethex, not by the model, and the endpoint is protected by the tool key. Fallback: ask Aethex.
+      const headerCaller = req.headers["x-confam-caller"];
+      const fromHeader = typeof headerCaller === "string" && /^\+[1-9]\d{7,14}$/.test(headerCaller.trim()) ? headerCaller.trim() : null;
+      const party = fromHeader
+        ? ({ phone: fromHeader, direction: agentKey === "hotline" ? "inbound" : "outbound" } as const)
+        : await resolver.resolve(env.data.call_id).catch((err) => {
+            req.log.warn({ err, callId: env.data.call_id }, "could not resolve call party");
+            return { phone: null, direction: null } as const;
+          });
+      const callerSource = fromHeader ? "header" : "lookup";
       const result = await tool.handler(
         args.data,
         { agentKey, callId: env.data.call_id ?? null, conversationId: env.data.conversation_id ?? null, party },
         deps,
       );
-      req.log.info({ tool: tool.name, callId: env.data.call_id, ms: Date.now() - started }, "tool ok");
+      req.log.info({ tool: tool.name, callId: env.data.call_id, callerSource, ms: Date.now() - started }, "tool ok");
       return reply.send(result);
     } catch (err) {
       req.log.error({ err, tool: tool.name, callId: env.data.call_id }, "tool failed");

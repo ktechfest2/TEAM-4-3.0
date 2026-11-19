@@ -299,7 +299,9 @@ export const reportClaim = define({
     }
 
     if (isNew) {
-      await deps.jobs.send(QUEUES.caseVerify, { caseId }, { singletonKey: `verify:${caseId}` });
+      // Don't ring the official while the reporter is still on the line (dual-SIM phones can't take a second call).
+      // The call.ended webhook starts verification as soon as this call ends; this is the fallback if it never arrives.
+      await deps.jobs.send(QUEUES.caseVerify, { caseId }, { startAfter: 90 });
       const [c] = await deps.db.select({ deadlineAt: claimCase.deadlineAt }).from(claimCase).where(eq(claimCase.id, caseId));
       await deps.jobs.send(QUEUES.caseAggregate, { caseId, reason: "deadline" }, { startAfter: c!.deadlineAt });
     }

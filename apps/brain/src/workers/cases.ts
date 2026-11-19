@@ -60,6 +60,9 @@ export function pickVerifiers<T extends { personId: string; affiliation: string 
 export async function handleCaseVerify(deps: AppDeps, job: CaseVerifyJob): Promise<void> {
   const [c] = await deps.db.select().from(claimCase).where(eq(claimCase.id, job.caseId));
   if (!c || c.status !== "verifying" || !c.wardId) return;
+  // Idempotent: verification may be started by the reporter's call.ended webhook and by the fallback timer.
+  const already = await deps.db.select({ id: verificationRequest.id }).from(verificationRequest).where(eq(verificationRequest.caseId, c.id)).limit(1);
+  if (already.length > 0) return;
 
   const reporters = await deps.db.select({ personId: report.personId }).from(report).where(eq(report.caseId, c.id));
   const exclude = new Set(reporters.map((r) => r.personId).filter(Boolean) as string[]);
