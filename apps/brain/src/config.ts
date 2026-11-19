@@ -46,6 +46,11 @@ export const ConfigSchema = z.object({
       }
     }),
   RUN_WORKERS: bool.default(true),
+  /** Demo-only numbers with no SIM: calls to them become Aethex WebSocket sessions collected from GET /sim/next. Empty = off. */
+  SIM_HANDSET_PREFIX: z
+    .string()
+    .default("")
+    .refine((s) => s === "" || /^\+\d{4,8}$/.test(s), "SIM_HANDSET_PREFIX must look like +234000"),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;

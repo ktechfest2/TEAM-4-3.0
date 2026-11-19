@@ -73,8 +73,9 @@ export async function runJob(deps: AppDeps, name: string, data: any) {
 
 /** Fake Aethex HTTP API at the network boundary: call records (who is on the line) and outbound triggers. */
 export class FakeAethex {
-  calls = new Map<string, { id: string; direction: string; from_number: string; to_number: string; agent_id?: string }>();
+  calls = new Map<string, { id: string; direction: string; from_number: string; to_number: string; agent_id?: string; conversation_id?: string }>();
   triggered: { agent_id: string; to_number: string; from_number: string; dynamic_variables: Record<string, unknown> }[] = [];
+  sessions: { agent_id: string; caller_phone: string; transport: string; dynamic_variables: Record<string, unknown> }[] = [];
   failNextTrigger: { status: number; body: unknown } | null = null;
   private seq = 0;
 
@@ -100,6 +101,15 @@ export class FakeAethex {
       this.calls.set(id, { id, direction: "outbound", from_number: body.from_number, to_number: body.to_number, agent_id: body.agent_id });
       return json(202, { id, status: "queued" });
     }
+    if (init?.method === "POST" && path === "/conversation/connect") {
+      const body = JSON.parse(String(init.body));
+      this.sessions.push(body);
+      const sessionId = `se_${++this.seq}`;
+      const id = `ca_ws_${this.seq}`;
+      this.calls.set(id, { id, direction: "inbound", from_number: body.caller_phone, to_number: "", agent_id: body.agent_id, conversation_id: sessionId });
+      return json(201, { session_id: sessionId, ws_url: `wss://aethex.test/ws/v1/conversation/${sessionId}` });
+    }
+    if ((!init?.method || init.method === "GET") && path === "/calls") return json(200, { data: [...this.calls.values()].reverse() });
     const m = /^\/calls\/([^/]+)$/.exec(path);
     if (m && (!init?.method || init.method === "GET")) {
       const c = this.calls.get(decodeURIComponent(m[1]!));
@@ -137,6 +147,7 @@ export function testConfig(overrides: Partial<Config> = {}): Config {
     ELECTION_TZ: "Africa/Lagos",
     AETHEX_AGENT_IDS: AGENTS,
     RUN_WORKERS: false,
+    SIM_HANDSET_PREFIX: "",
     ...overrides,
   };
 }
@@ -170,4 +181,5 @@ export async function resetDb(env: TestEnv): Promise<void> {
   await seed(env.handle.db, env.crypto, { officialPhones: [TEAM[0]!], voterPhones: [TEAM[1]!, TEAM[2]!], officialPin: OFFICIAL_PIN });
   env.jobs.jobs = [];
   env.aethex.triggered = [];
+  env.aethex.sessions = [];
 }

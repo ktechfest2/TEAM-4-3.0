@@ -4,6 +4,7 @@ import { AethexClient } from "./aethex/client.ts";
 import { buildApp } from "./app.ts";
 import { loadConfig } from "./config.ts";
 import type { AppDeps } from "./context.ts";
+import { SimHandsets } from "./sim.ts";
 import { bossQueue, startBoss, startWorkers } from "./workers/index.ts";
 
 const config = loadConfig();
@@ -22,7 +23,9 @@ const deps: AppDeps = {
   aethex: new AethexClient({ apiKey: config.AETHEX_API_KEY, baseUrl: config.AETHEX_BASE_URL }),
   jobs: bossQueue(boss),
   log,
+  ...(config.SIM_HANDSET_PREFIX ? { sim: new SimHandsets() } : {}),
 };
+if (config.SIM_HANDSET_PREFIX && !config.RUN_WORKERS) log.warn("SIM_HANDSET_PREFIX needs RUN_WORKERS in the same process: parked sessions live in memory");
 
 if (!config.AETHEX_WEBHOOK_SECRET) log.warn("AETHEX_WEBHOOK_SECRET is empty: all webhooks will be rejected until provisioning sets it");
 for (const k of ["hotline", "verifier", "alert", "official"] as const) {

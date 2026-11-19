@@ -387,6 +387,64 @@ describe("dialer guards", () => {
   });
 });
 
+describe("simulated handsets (demo numbers with no SIM)", () => {
+  const SIM_PHONE = "+2340000000101";
+  async function addSimVoter() {
+    const [p] = await env.deps.db
+      .insert(person)
+      .values({ displayName: "Demo voter", phoneHash: env.crypto.hash(SIM_PHONE), phoneEnc: env.crypto.encrypt(SIM_PHONE), phoneLast4: "0101", consentAt: new Date() })
+      .returning();
+    return p!;
+  }
+  async function moveAlert(personId: string) {
+    await env.deps.jobs.send(QUEUES.alertTransfer, { personId, fromPuId: (await pu("LA-SUR-05-001")).id, toPuId: (await pu("LA-SUR-05-003")).id, transferId: "00000000-0000-4000-8000-000000000009" });
+    await env.jobs.drain(env.deps, [QUEUES.alertTransfer, QUEUES.dial]);
+  }
+  const next = (phone: string, key = TOOL_KEY) => app.inject({ method: "GET", url: `/sim/next?phone=${encodeURIComponent(phone)}`, headers: { "x-confam-tool-key": key } });
+
+  it("skips demo numbers when simulated handsets are off", async () => {
+    const p = await addSimVoter();
+    await moveAlert(p.id);
+    expect(env.aethex.sessions).toHaveLength(0);
+    expect(await env.deps.db.select().from(outboundAttempt).where(eq(outboundAttempt.decision, "skipped_demo_contact"))).toHaveLength(1);
+    expect((await next(SIM_PHONE)).statusCode).toBe(404);
+  });
+
+  it("opens a real agent session instead of a phone call, and the normal tools and state follow", async () => {
+    const { SimHandsets } = await import("../src/sim.ts");
+    const saved = { prefix: env.deps.config.SIM_HANDSET_PREFIX, sim: env.deps.sim };
+    env.deps.config.SIM_HANDSET_PREFIX = "+234000";
+    env.deps.sim = new SimHandsets();
+    try {
+      const p = await addSimVoter();
+      await moveAlert(p.id);
+      expect(env.aethex.triggered).toHaveLength(0); // never touches the phone network
+      expect(env.aethex.sessions).toHaveLength(1);
+      expect(env.aethex.sessions[0]).toMatchObject({ agent_id: AGENTS.alert, caller_phone: SIM_PHONE, transport: "websocket" });
+      expect(String(env.aethex.sessions[0]!.dynamic_variables.alert_script_en)).toContain("St. Mary");
+      const [a] = await env.deps.db.select().from(alert).where(eq(alert.personId, p.id));
+      expect(a!.status).toBe("calling");
+      expect(a!.aethexCallId).toMatch(/^ca_ws_/);
+
+      expect((await next(SIM_PHONE, "wrong")).statusCode).toBe(401);
+      expect((await next(VOTER_A)).statusCode).toBe(400); // real numbers are never simulated
+      const got = await next(SIM_PHONE);
+      expect(got.statusCode).toBe(200);
+      expect(got.json()).toMatchObject({ purpose: "notice_alert", agent: "alert", call_id: a!.aethexCallId });
+      expect(got.json().ws_url).toMatch(/^wss:\/\//);
+      expect((await next(SIM_PHONE)).statusCode).toBe(204); // a session is handed out once
+
+      const heard = await tool("confirm_alert_heard", {}, { agent: "alert", callId: a!.aethexCallId! });
+      expect(heard.body.ok).toBe(true);
+      const [after] = await env.deps.db.select().from(alert).where(eq(alert.id, a!.id));
+      expect(after!.status).toBe("heard");
+    } finally {
+      env.deps.config.SIM_HANDSET_PREFIX = saved.prefix;
+      env.deps.sim = saved.sim;
+    }
+  });
+});
+
 describe("aethex webhooks", () => {
   async function post(body: object, secret = WEBHOOK_SECRET) {
     const raw = JSON.stringify(body);

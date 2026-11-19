@@ -3,6 +3,7 @@ import type pg from "pg";
 import type { Db, PhoneCrypto } from "@confam/db";
 import type { AethexClient } from "./aethex/client.ts";
 import type { Config } from "./config.ts";
+import type { SimHandsets } from "./sim.ts";
 
 export interface SendOptions {
   startAfter?: number | Date;
@@ -26,4 +27,6 @@ export interface AppDeps {
   jobs: JobQueue;
   log: Logger;
   now?: () => Date;
+  /** Present when SIM_HANDSET_PREFIX is set. */
+  sim?: SimHandsets;
 }

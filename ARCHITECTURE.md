@@ -318,3 +318,4 @@ erDiagram
 | 14 | 11-19 | Serve MapLibre's worker from `public/` (copied at build) | Turbopack breaks MapLibre's default worker loading | CDN worker URL |
 | 15 | 11-19 | Agent `messaging_system_prompt` mirrors the voice prompt | Lets chat-based evals test the same behaviour callers get | Separate chat prompt |
 | 16 | 11-19 | Override handled by a brain worker (`case-override` queue) | One place owns verdict logic; web only enqueues | Web writes verdicts directly |
+| 17 | 11-20 | Simulated handsets: numbers under `SIM_HANDSET_PREFIX` (+234000, demo only) get an Aethex WebSocket session instead of a phone call, collected from `GET /sim/next` | Lets the demo film and tests drive the real agents, tools, verdicts and callbacks without ringing a real phone. Real numbers are never simulated | Editing production rows by hand; skipping demo contacts |

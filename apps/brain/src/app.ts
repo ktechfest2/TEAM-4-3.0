@@ -113,6 +113,19 @@ export async function buildApp(deps: AppDeps, opts: { resolver?: CallerResolver 
     }
   });
 
+  // Simulated handsets (demo numbers only): hands the next parked call for a handset to the client that plays it.
+  app.get<{ Querystring: { phone?: string } }>("/sim/next", async (req, reply) => {
+    const key = req.headers["x-confam-tool-key"];
+    if (typeof key !== "string" || !safeEqual(key, deps.config.CONFAM_TOOL_KEY)) return reply.code(401).send({ error: "unauthorized" });
+    const prefix = deps.config.SIM_HANDSET_PREFIX;
+    if (!deps.sim || !prefix) return reply.code(404).send({ error: "sim_handsets_disabled" });
+    const phone = (req.query.phone ?? "").trim();
+    if (!/^\+[1-9]\d{7,14}$/.test(phone) || !phone.startsWith(prefix)) return reply.code(400).send({ error: "not_a_sim_handset" });
+    const next = deps.sim.take(phone);
+    if (!next) return reply.code(204).send();
+    return reply.send({ purpose: next.purpose, agent: next.agent, call_id: next.callId, session_id: next.sessionId, ws_url: next.wsUrl });
+  });
+
   app.post("/webhooks/aethex", async (req, reply) => {
     const raw = req.rawBody ?? "";
     const sig = verifyAethexSignature(raw, req.headers["x-aethex-signature"] as string | undefined, deps.config.AETHEX_WEBHOOK_SECRET);

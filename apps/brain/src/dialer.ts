@@ -88,7 +88,8 @@ export async function dial(deps: AppDeps, req: DialRequest): Promise<DialOutcome
   } catch {
     return skip("skipped_no_phone");
   }
-  if (p.isDemo || isDemoNumber(e164)) return skip("skipped_demo_contact");
+  const simulated = Boolean(deps.sim && deps.config.SIM_HANDSET_PREFIX && e164.startsWith(deps.config.SIM_HANDSET_PREFIX));
+  if (!simulated && (p.isDemo || isDemoNumber(e164))) return skip("skipped_demo_contact");
   if (QUIET_HOURS_PURPOSES.has(req.purpose) && !settings?.electionDay && settings && inWindow(now, deps.config.ELECTION_TZ, settings.quietStart, settings.quietEnd)) {
     return skip("skipped_quiet_hours");
   }
@@ -112,17 +113,31 @@ export async function dial(deps: AppDeps, req: DialRequest): Promise<DialOutcome
   if (!agentId) return skip("error", `no Aethex agent configured for ${agentKey}`);
 
   try {
-    const res = await deps.aethex.triggerCall({
-      agentId,
-      toNumber: e164,
-      fromNumber: deps.config.CONFAM_LINE_NUMBER,
-      dynamicVariables: req.dynamicVariables,
-      metadata: { purpose: req.purpose, ref_id: req.refId, row_id: req.rowId, person_id: p.id },
-    });
-    const aethexCallId = String(res.id);
+    let aethexCallId: string;
+    let status: string;
+    if (simulated) {
+      // No phone network: open the same agent with the same variables as a WebSocket session and park it for the handset's client.
+      const session = await deps.aethex.connectWebSocketSession({ agentId, callerPhone: e164, dynamicVariables: req.dynamicVariables });
+      const c = await deps.aethex.findCallForSession(session.session_id);
+      if (!c) throw new AethexError("simulated call record not found", 503, "sim_call_missing", undefined, undefined);
+      aethexCallId = String(c.id);
+      status = "queued";
+      deps.sim!.park({ phone: e164, purpose: req.purpose, agent: agentKey, callId: aethexCallId, sessionId: session.session_id, wsUrl: session.ws_url });
+      deps.log.info({ purpose: req.purpose, refId: req.refId, callId: aethexCallId }, "simulated handset session parked");
+    } else {
+      const res = await deps.aethex.triggerCall({
+        agentId,
+        toNumber: e164,
+        fromNumber: deps.config.CONFAM_LINE_NUMBER,
+        dynamicVariables: req.dynamicVariables,
+        metadata: { purpose: req.purpose, ref_id: req.refId, row_id: req.rowId, person_id: p.id },
+      });
+      aethexCallId = String(res.id);
+      status = res.status ?? "queued";
+    }
     await deps.db
       .insert(call)
-      .values({ aethexCallId, agent: agentKey, direction: "outbound", personId: p.id, purpose: req.purpose, refId: req.refId, status: res.status ?? "queued" })
+      .values({ aethexCallId, agent: agentKey, direction: "outbound", personId: p.id, purpose: req.purpose, refId: req.refId, status })
       .onConflictDoNothing();
     await markRow("calling", aethexCallId);
     await record("dialled", { aethexCallId });

@@ -109,6 +109,28 @@ export class AethexClient {
     });
   }
 
+  /** Opens a real-time WebSocket conversation (used for simulated handsets). */
+  connectWebSocketSession(input: {
+    agentId: string;
+    callerPhone: string;
+    dynamicVariables?: Record<string, string | number | boolean>;
+  }): Promise<{ session_id: string; ws_url: string }> {
+    return this.request("POST", "/conversation/connect", {
+      agent_id: input.agentId,
+      transport: "websocket",
+      audio_format: "pcm_16000",
+      direction: "inbound",
+      caller_phone: input.callerPhone,
+      dynamic_variables: input.dynamicVariables,
+    });
+  }
+
+  /** The call record Aethex creates for a conversation session (its id is what tools receive as call_id). */
+  async findCallForSession(sessionId: string): Promise<AethexCall | null> {
+    const res = await this.request<{ data?: AethexCall[] }>("GET", "/calls?limit=25", undefined, 5_000);
+    return (res.data ?? []).find((c) => c.conversation_id === sessionId || c.voice_session_id === sessionId) ?? null;
+  }
+
   getCall(callId: string): Promise<AethexCall> {
     return this.request<AethexCall>("GET", `/calls/${encodeURIComponent(callId)}`, undefined, 4_000);
   }
