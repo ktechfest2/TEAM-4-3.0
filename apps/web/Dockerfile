@@ -15,7 +15,7 @@ RUN npm run build -w @confam/web
 FROM node:24-slim
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 NPM_CONFIG_UPDATE_NOTIFIER=false
 WORKDIR /app
-COPY --from=build /app /app
+COPY --from=build --chown=node:node /app /app
 USER node
 EXPOSE 3100
 # If ADMIN_EMAIL and ADMIN_PASSWORD are set (Railway secrets), ensure that control-room admin exists before starting.
