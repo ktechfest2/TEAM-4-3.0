@@ -1,74 +1,201 @@
 # Confam
 
-**A phone line anyone can call, from any phone, to check an election rumour.** Callers speak English, Pidgin, Yoruba, Hausa or Igbo, and Confam answers in Pidgin or English. If Confam doesn't already know the answer, it **phones trusted people at that place**, works out a verdict automatically, and **calls the voter back**. It also calls voters when their polling unit moves, chases officials who haven't shown up, and tells elderly and disabled voters when it's time to go.
+**A phone number that tells Nigerian voters what's true on election day, and calls them when something changes.**
 
-Built for K-Tech Fest, "Every Vote, Every Voice". Weak link chosen: voter information and misinformation, plus visibility of staff on election day. See [ARCHITECTURE.md](ARCHITECTURE.md) for the full design and [docs/research.md](docs/research.md) for the sources behind every decision.
+*Built for K-Tech Fest, "Every Vote, Every Voice".* · [Website](https://web-production-13f1563e.up.railway.app) · [INEC control room](https://web-production-13f1563e.up.railway.app/control) · [One-page problem brief](docs/problem-brief.md) · Call Confam: **+1 864 808 9401**
+
+![Confam, the voter line](docs/images/landing-hero.png)
+
+---
+
+## Amara's morning
+
+It's election day in Surulere, Lagos. Amara has her voter's card and an ₦8,000 keypad phone. No WhatsApp, no data.
+
+She walks to the primary school where she voted last time and finds out **her polling unit moved**. INEC sent a text two weeks ago, but it was lost in a pile of bank alerts and promos. When she finds the new place, the queue is long and **nobody can tell her if the officials are coming**. Then a neighbour shows her a voice note: *"Dem dey fight for Ojuelegba, no go there."* Is it true? There's no way to check. Half the queue goes home.
+
+Her father is 78. He wants to vote, but standing in a queue for three hours isn't possible, and nobody has told him he doesn't have to.
+
+None of this is about ballot boxes or result sheets. **It's about information.** Each problem is a small piece of missing or false information, and together they decide whether people vote and whether they trust what happens next.
+
+## Where Confam fits in the voting chain
+
+```
+Inform voters  ──►  Identify voters  ──►  Move staff & materials  ──►  Vote & count  ──►  Transmit results  ──►  Disputes
+   ▲ Confam                                  ▲ Confam
+```
+
+We chose the first weak link: **getting accurate information to voters and stopping rumours**, plus **knowing where officials are on the morning of the vote**. If voters can't get the truth, every later link suffers: turnout drops, rumours fill the gap, and people stop believing results.
+
+## Why a phone call
+
+Most election tech assumes a smartphone, data and the ability to read English. Many of the people who most need help have none of these: older voters, rural voters, people on ₦8,000 phones, people who read Yoruba or Hausa better than English, or not at all.
+
+Almost everyone can make a phone call. So Confam lives there. You call a number and talk the way you talk at home, in **Yoruba, Hausa, Igbo, Pidgin, English or a mix**, and Confam understands you and answers right away. No app, no data, no forms, and no need to read.
+
+## What happens when Amara has Confam
+
+**A rumour starts.** Amara calls and says, in Yoruba, *"they say there's fighting at Ojuelegba."* Confam doesn't guess. It says it will check, and the moment she hangs up it **phones the presiding officer at that polling unit**: *"A voter just reported fighting near Ojuelegba Primary School. Is that true right now?"* The officer says no. Seconds later Confam **calls Amara back**: *"Not true. The presiding officer at Ojuelegba Primary School confirmed it directly."* The next person who asks gets the answer immediately, because Confam remembers what it has verified, for as long as it stays fresh.
+
+**Her polling unit moves.** In the INEC control room, an official moves Amara to St. Mary's Catholic School. **Her phone rings within seconds**, with the new address and a landmark she knows. It's a call she can't miss, not a text she won't read.
+
+**Officials are late.** Amara calls: *"Have the officials reached Ojuelegba?"* Confam answers from the presiding officer's own check-in: *"Yes, they arrived at 7:42."* If officials haven't checked in by the opening deadline, Confam **calls the presiding officer** to ask why, then their supervisor.
+
+**Her father needs help.** He calls Confam and says he's old and can't stand for long. Confam tells him his rights: he doesn't have to queue, and he can bring a helper he trusts (but never a party agent). It warns the officials at his polling unit, then **calls him back when they're ready**: *"The officials are there and know you're coming. You can go now."*
+
+**Someone who isn't registered calls.** They can still ask about rumours and whether officials have arrived. If they ask *"where do I vote?"*, Confam tells them kindly to register with INEC first. Only people on the voter list get information about their own polling unit.
+
+## The INEC control room
+
+Every call, verdict and check-in shows up live in a web dashboard for election officials. This is how INEC runs Confam, and how a judge can test it with their own phone number.
+
+| Page | What officials do there |
+|---|---|
+| **Overview** | Live activity feed, ward board for all 12 Surulere wards, rumours being checked, and a **pause-all switch** that stops every outbound call at once |
+| **Situation board** | Everything Confam currently "knows" and will answer instantly, and how long each answer stays valid |
+| **Rumours** | Each rumour, who reported it and in what words, what the official answered, the verdict, and who was called back. Officials can **override a verdict**; everyone who reported it gets a correction call |
+| **Voter list** | The register (a stand-in for INEC's). **Move a voter** and Confam calls them immediately. Elderly and disability requests appear here too |
+| **Officials** | Register presiding officers (each gets a private 4-digit PIN for check-ins), see their latest check-in, reset PINs |
+| **Polling units** | Live map of every unit coloured by officials' status; issue a **relocation notice** that calls every registered voter of that unit |
+| **Calls** | Every call with its full transcript, and every outbound decision with the reason a call was or wasn't placed |
+
+![INEC control room overview](docs/images/control-overview.png)
+
+<table>
+<tr>
+<td><img src="docs/images/control-voters.png" alt="Voter list: register voters and move-and-call"></td>
+<td><img src="docs/images/control-units.png" alt="Polling units map and relocation notice"></td>
+</tr>
+</table>
+
+## Trust rules built into Confam
+
+- **Confam never makes up a verdict.** The voice agent can only repeat answers the system produced from an official's own words, and every verdict says who confirmed it.
+- **The person at the polling unit decides.** One presiding officer's answer settles a rumour about their unit. If no clear answer comes in time, Confam says "we could not confirm" and points people to official INEC channels.
+- **Officials prove who they are.** A check-in only counts if it comes from the official's registered phone **and** includes their PIN. Five wrong tries locks check-ins for an hour.
+- **Politically neutral, and safety first.** Confam never endorses a party or candidate. Anyone in danger is told to move to safety and call 112, and no one is ever asked to go and check a dangerous place.
+- **People stay in control.** Voters are called only after INEC registers them, or after they agree to a callback. "Stop calling me" works at any time, and phone numbers are encrypted and shown masked everywhere.
+- **No phone voting.** The Electoral Act 2026 (s.55) requires voting in person, so Confam helps people get to the polls instead.
 
 ## How it works
 
+```mermaid
+sequenceDiagram
+  participant A as Amara (any phone)
+  participant C as Confam voice agent
+  participant B as Confam backend
+  participant O as Presiding officer
+  participant I as INEC control room
+  A->>C: "Dem say fight dey Ojuelegba" (Yoruba, Pidgin, English…)
+  C->>B: report the claim (place, category)
+  B-->>C: not verified yet
+  C-->>A: "I go check, I go call you back"
+  Note over A: hangs up
+  B->>O: call: "Is this true right now?"
+  O-->>B: "No, everything is calm"
+  B->>B: verdict = false, source = the presiding officer
+  B->>A: callback with the verdict
+  B-->>I: live update (rumour, verdict, calls)
 ```
-Voter's phone ──► Telnyx number ──► Aethex voice agent (speech in 5 languages, Claude Sonnet 4.6)
-                                          │  custom tools (HTTPS, mid-call)
-                                          ▼
-                              apps/brain (Fastify + pg-boss workers) ──► Postgres
-                                          │  outbound calls: verifiers, callbacks, alerts, late officials
-                                          ▼
-                              Aethex /calls/trigger ──► Telnyx ──► people on the ground
 
-INEC control room ──► apps/web (Next.js) ──► same Postgres (live via LISTEN/NOTIFY)
+One phone number connects to one voice agent for incoming calls. Three more agents make outgoing calls: one asks officials, one delivers alerts, one chases late officials. They all share one backend that remembers what is true and decides who to call.
+
+## How AI is used
+
+AI does the **language work**. Plain code makes the **decisions**.
+
+- **Understanding callers.** Aethex's speech recognition turns what a caller says into text, in Yoruba, Hausa, Igbo, Pidgin, English or a mix. Claude Haiku 4.5 (running inside Aethex) works out what they want, turns a rumour into one short neutral English sentence with a category and a place, and decides which Confam tool to use.
+- **Talking back.** The same model phrases short spoken replies, and Aethex's Nigerian-accented voices speak them.
+- **What AI never does:** decide whether a rumour is true, choose who to call, or invent a verdict. Verdicts come only from an official's recorded answer and fixed rules in our backend (one presiding officer's answer settles it; no answer means "unverified"). The voice agent can only read out verdict text the backend wrote, and every verdict names who confirmed it.
+- **Grouping rumours.** The same rumour said in different words is matched with fuzzy text search in Postgres (pg_trgm), not an AI model, so results are predictable and fast.
+
+## Under the hood
+
+```mermaid
+flowchart LR
+  P[Any phone] -- call --> T[Telnyx number]
+  T -- SIP --> X[Aethex voice agents<br/>speech in 5 languages<br/>Claude Haiku 4.5]
+  X -- tools over HTTPS --> BR[Brain<br/>Fastify + workers]
+  X -- signed webhooks --> BR
+  BR --> DB[(Postgres<br/>+ pg_trgm)]
+  BR -- outbound calls --> X
+  W[INEC control room<br/>Next.js] --> DB
+  DB -- LISTEN/NOTIFY --> W
 ```
 
-| Package | What it is |
-|---|---|
-| `packages/db` | Drizzle schema and migrations, phone encryption (HMAC lookup + AES-256-GCM), Surulere demo seed, shared job names |
-| `apps/brain` | Tool endpoints the voice agents call, signed Aethex webhooks, the dialer (single guarded path to outbound calls), verification/alert/lateness workers, agent prompts and provisioning |
-| `apps/web` | INEC control room: rumours and verdicts, polling-unit map and relocation notices, people and PINs, call transcripts, pause-all switch, settings |
+| Layer | What we use | Why |
+|---|---|---|
+| Phone number | **Telnyx** | Carries the calls; connected to Aethex over SIP |
+| Voice | **Aethex AI** voice agents, Nigerian-accented voices | Understands callers in Yoruba, Hausa, Igbo, Pidgin, English and mixes of them (we tested it with native-speaker recordings), with low-latency turn-taking |
+| Language model | **Claude Haiku 4.5** (through Aethex) | Fast enough for natural conversation; understands all five languages |
+| Backend ("brain") | **Node 24, TypeScript, Fastify, Zod** | The tools the agents call during a call, signed webhooks, and the rules for verdicts and calls |
+| Jobs | **pg-boss** on Postgres | Durable background work: calling officials, callbacks, retries, the lateness sweep |
+| Database | **Postgres 16 + Drizzle ORM + pg_trgm** | Voters, officials, rumours, verdicts and calls. Fuzzy matching groups the same rumour said in different words |
+| Control room | **Next.js 16, React 19, Tailwind 4, Motion, MapLibre** | Live dashboard updated over server-sent events from Postgres LISTEN/NOTIFY |
+| Hosting | **Railway** | Brain, control room and Postgres in one project |
+| Quality | **Vitest** (55 backend tests), **Playwright** (16 browser tests on desktop and mobile), GitHub Actions CI | Every change is tested before deploy, and again on the live site |
 
-## Run it locally
+A few details that make it work on real Nigerian phone lines:
+- **Speed.** The agent answers without looking anything up first. Aethex sends the caller's number with every tool request, so our tools answer in milliseconds.
+- **Dual-SIM safe.** Confam waits until a reporter hangs up before calling the official, in case both numbers are in the same phone, and tries 3 times.
+- **Messy caller IDs.** Nigerian numbers sometimes arrive as `+1 234…` or `+234 0…`. Confam repairs them, so callbacks reach the right person.
+- **Answers are never lost.** If an official answers but the agent fails to record it, the backend reads the yes or no from the call transcript.
 
-Requirements: Node 22+, Docker (Postgres), an Aethex API key, a Telnyx number, and ngrok (so Aethex can reach your machine).
+Full design: [ARCHITECTURE.md](ARCHITECTURE.md) · Research and sources: [docs/research.md](docs/research.md)
+
+## Try it
+
+1. **Call +1 864 808 9401** and ask *"Where is Ojuelegba Primary School polling unit?"*, or report a rumour, in whatever language you speak.
+2. **Open the control room** at https://web-production-13f1563e.up.railway.app/control. Ask the team for a judge login, add your own number to the **Voter list**, then press **Move and call**.
+3. Register yourself under **Officials** to receive Confam's verification calls when someone reports a rumour at your polling unit.
+
+The demo covers the 12 real wards of Surulere LGA. The polling units in it are demo records, because INEC's polling-unit directory isn't publicly downloadable.
+
+## Run it yourself
 
 ```bash
 npm ci
-cp .env.example .env            # fill in the values (see below)
-docker run -d --name confam-pg -e POSTGRES_USER=confam -e POSTGRES_PASSWORD=confam -e POSTGRES_DB=confam -p 54329:5432 postgres:16-alpine
+cp .env.example .env           # fill in Aethex, Telnyx and secret values
 npm run db:migrate && npm run db:seed
-ngrok http 8787                 # put the https URL in PUBLIC_BRAIN_URL
+npm run dev:brain              # tools, webhooks and workers on :8787 (expose it with ngrok)
 npm run provision:aethex -w @confam/brain -- --write-env --connect-number
-npm run dev:brain               # tools, webhooks and workers on :8787
-ADMIN_PASSWORD='choose-a-long-one' npm run admin:create -w @confam/web -- you@example.com admin
-npm run dev -w @confam/web      # control room on http://localhost:3100
+npm run dev -w @confam/web     # control room on http://localhost:3100
 ```
 
-### Environment
+Tests: `npm test -w @confam/brain` (needs Postgres) and `npx playwright test -c apps/web` (needs a running build).
 
-| Variable | Purpose |
-|---|---|
-| `DATABASE_URL` | Postgres connection |
-| `AETHEX_API_KEY` | Aethex REST key |
-| `AETHEX_WEBHOOK_SECRET` | Written by provisioning (Aethex shows it once) |
-| `AETHEX_AGENT_IDS` | JSON map written by provisioning |
-| `TELNYX_API_KEY`, `CONFAM_LINE_NUMBER` | Carrier key and the Confam number (E.164) |
-| `PUBLIC_BRAIN_URL` | Public HTTPS URL of the brain (tools and webhooks) |
-| `CONFAM_TOOL_KEY` | Shared secret Aethex sends on every tool call |
-| `PHONE_PEPPER`, `PHONE_ENC_KEY` | 32-byte base64 keys for phone hashing and encryption |
-| `AUTH_SECRET` | Dashboard session signing key |
-| `DEMO_MODE`, `DEMO_TEAM_PHONES` | In demo mode only these numbers are ever dialled |
-| `DEMO_OFFICIAL_PIN` | PIN for the team's polling-official role (seed) |
+## Honest limits
 
-## Tests
+- **The number is American (+1 864 808 9401).** We had 48 hours, and getting a Nigerian number takes regulatory paperwork we couldn't finish in time. Two side effects you may notice: calling it from Nigeria is an international call, and Confam's calls to Nigerian phones sometimes show up as a random local number, because international routes into Nigeria often replace the caller ID. A Nigerian number fixes both.
+- **The voter list and polling units are demo data.** The 12 Surulere wards are real; the polling units and voter list stand in for INEC's register, which isn't public.
 
-```bash
-npm test -w @confam/brain        # 40 unit + integration tests (needs Postgres; TEST_DATABASE_URL)
-npm run lint -w @confam/web
-npm run build -w @confam/web && npm start -w @confam/web &
-npx playwright test -c apps/web  # 16 end-to-end tests, desktop + mobile (ADMIN_EMAIL/ADMIN_PASSWORD)
-```
+## What's next
 
-## Safety rules built in
+- **A Nigerian phone number** through Africa's Talking (which Aethex already integrates) or a Telnyx +234 number, so Confam is a local call and shows a proper local caller ID.
+- **INEC's real register and polling-unit directory** in place of the demo data, matched by voter ID (VIN) and phone number.
+- **Results verification:** the same "ask the person on the ground" method can check a photographed result sheet against what officials uploaded.
 
-- Verdicts come only from independent verifiers: at least 2 must agree (reputation-weighted, party agents capped). Otherwise the verdict is "unverified".
-- The voice agent can only repeat verdict text produced by the system, never its own. It is politically neutral and sends anyone in danger to 112.
-- One dialer path, with a pause-all switch, a demo allowlist, cooldowns and quiet hours. Every decision is logged and visible in the control room.
-- Phone numbers are encrypted at rest and masked everywhere. No real numbers live in this public repo.
-- Voting by phone is out of scope: it's illegal under s.55 of the Electoral Act 2026.
+## Credits and AI declaration
+
+**AI coding assistant (declared under rule 1.4).** Confam was designed and built during the hackathon with **Claude Code, powered by Claude Opus 5.5** (Anthropic), working with our team. It handled the research, architecture, backend, control room, tests, landing page and deployment, under our direction and testing on real phones.
+
+**AI models used in the product (rule 1.2)**
+- [Aethex AI](https://aethexai.com) voice agents: speech recognition, turn-taking and Nigerian-accented voices.
+- [Claude Haiku 4.5](https://www.anthropic.com/claude) by Anthropic, as the agents' language model (through Aethex).
+- [Higgsfield](https://higgsfield.ai) (GPT Image model) for the landing-page photographs of Amara, her father and the presiding officer. They are AI-generated illustrations, not real people.
+
+**Services and APIs**
+- [Telnyx](https://telnyx.com) phone number and voice routing.
+- [Railway](https://railway.com) hosting for the backend, control room and Postgres.
+- [OpenFreeMap](https://openfreemap.org) map tiles, using [OpenStreetMap](https://www.openstreetmap.org/copyright) data © OpenStreetMap contributors.
+
+**Data**
+- Surulere ward names: INEC's ward list as compiled in [dharmzeey/webscraping-electoral](https://github.com/dharmzeey/webscraping-electoral). Polling units, voters and officials in the demo are demo records.
+- Native-speaker speech used only to *test* language understanding (not shipped): [shunyalabs/yoruba-speech-dataset](https://huggingface.co/datasets/shunyalabs/yoruba-speech-dataset), [shunyalabs/hausa-speech-dataset](https://huggingface.co/datasets/shunyalabs/hausa-speech-dataset), [mkg25gpx/igbosyncorp-igbo-asr-benchmark](https://huggingface.co/datasets/mkg25gpx/igbosyncorp-igbo-asr-benchmark) on Hugging Face.
+- Legal and research sources: the [Electoral Act 2026](https://thewest.ng/wp-content/uploads/2026/03/ElectoralAct2026.pdf) (s.47, s.54, s.55), INEC regulations and reports, and reporting from Dubawa, the Reuters Institute, TheCable, Dataphyte, PLAC and others. Every claim is linked in [docs/research.md](docs/research.md).
+
+**Open-source libraries:** Next.js, React, Tailwind CSS, Motion, GSAP, Lenis, MapLibre GL JS, Fastify, Zod, Drizzle ORM, node-postgres, pg-boss, jose, pino, Vitest, Playwright and TypeScript, under their respective licences.
+
+---
+
+Repository layout: `apps/brain` (voice tools, webhooks, workers), `apps/web` (INEC control room), `packages/db` (schema, migrations, phone encryption, seed). See [VERIFY.md](VERIFY.md) for how every release is checked.
