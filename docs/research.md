@@ -64,3 +64,17 @@ Researched 2026-11-18. Each claim has a source link. Items marked **UNVERIFIED**
 - **Canada (Ontario municipalities):** over 215 use internet or telephone (IVR) voting, with a mailed PIN plus date of birth. Canada's online-voting standard **excludes IVR from its scope**, so security assurance is weaker. → [Simply Voting PIA](https://www.hanover.ca/sites/default/files/2026-08/Simply%20Voting_PIA_ReRA_Ontario_Municipal%202026-05-25.pdf), [Kawartha Lakes](https://kawarthalakes-014-ca.govstack.com/government-administration/elections/electronic-voting/)
 
 **Conclusion.** Building phone voting would break s.55 and could not prove the voter's identity (BVAS) or keep the ballot secret on a shared basic phone. What the law already allows, and what the agent can make actually happen, is: **priority access, a helper chosen by the voter, and s.54(2) off-site or assisted arrangements requested in advance**, plus a "go now, the queue is short and officials are there" call. A phone ballot like Australia's AEC model can be a "future, requires amending s.55" slide in the pitch.
+
+## 8. Live check of the Aethex account + local-language options (2026-11-19)
+
+- **Live API test with the team's key:** creating an agent with `language: yoruba` / `hausa` / `nigerian_pidgin` returns `403 language_not_available` ("…available on the Aethex enterprise platform only"). Request IDs: 2bc85383-6c81-49d0-8cc0-bd37555b1562, c3c31d35-c2a9-4ea8-b654-b038b121a1cc, d9d3d5e0-796d-4119-ac27-674ebab9438b. `GET /voices` returns 100 voices: English (about 45 Nigerian-accented: Femi, Kemi, Chinedu, Fatima, Musa, Ifeoma…) and French. None are in Yoruba, Hausa or Igbo. The catalog models include claude-opus-5-5, claude-sonnet-4-6 and claude-haiku-4-5. This matches the public [languages page](https://developers.aethexai.com/docs/concepts/languages).
+- **Spitch** (from the official SDK [spi-tch/spitch-python](https://github.com/spi-tch/spitch-python), generated from their OpenAPI spec):
+  - TTS is `POST /v1/speech {text, voice, format, language, speed}`. Voices include sade, segun, femi, funmi (yo), amina, aliyu, hasan, zainab (ha), ngozi, amara, obinna, ebuka (ig) and others.
+  - **TTS outputs `mulaw`, `alaw` and `pcm_s16le`, so it is telephony-ready.**
+  - STT is `POST /v1/transcriptions {content, language, timestamp, special_words}` and is **batch only (file/bytes/URL). The SDK has no streaming.**
+  - Also offers `/v1/translate` and `/v1/diacritics`.
+  - Pricing as listed via Cencori: TTS $0.030 per 1k chars, STT $0.010/min. New accounts get $1 free credit. → [Cencori changelog](https://cencori.com/changelog/spitch-on-cencori), [iAfrica](https://iafrica.com/cencori-and-spitch-partner-to-give-african-developers-yoruba-hausa-igbo-and-amharic-voice-ai-through-one-api/)
+- **Other Nigerian speech vendors (self-reported, unverified):**
+  - [Indigenius](https://indigenius.ai/): streaming plus SIP/Twilio, Hausa and Yoruba, Igbo "coming soon".
+  - [9jaLingo](https://www.9jalingo.org/): streaming TTS/STT for ha, ig, yo and Pidgin.
+  - [Maraba/Orinode](https://maraba.ai/blog/voice-to-text-nigeria/): STT trained on telephone audio, with code-switching.
