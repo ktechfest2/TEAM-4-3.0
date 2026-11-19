@@ -26,7 +26,7 @@ export default async function Settings() {
           </div>
           <div>
             <dt className="text-sm text-muted">Mode</dt>
-            <dd className="text-lg">{process.env.DEMO_MODE === "true" ? "Demo: only team phones are dialled" : "Production"}</dd>
+            <dd className="text-lg">{process.env.DEMO_MODE === "true" ? "Demo: real calls go only to numbers registered here (voters, officials) and people who called in" : "Production"}</dd>
           </div>
           <div className="sm:col-span-2">
             <dt className="text-sm text-muted">Languages</dt>

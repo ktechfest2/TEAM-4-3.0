@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { useActionState, useMemo, useState, useTransition } from "react";
-import { addPerson, createRelocation, removePerson, resetPin, undoRelocation, updateSettings, type ActionState } from "@/lib/server/actions";
+import { addOfficial, addVoter, createRelocation, moveVoter, removePerson, resetPin, undoRelocation, updateSettings, type ActionState } from "@/lib/server/actions";
 
 function Result({ state }: { state: ActionState }) {
   return (
@@ -73,8 +73,7 @@ export function RelocationForm({ units }: { units: PuOption[] }) {
       <AnimatePresence>
         {selected && (
           <motion.p initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden text-[15px] text-muted">
-            Confam will call <strong className="text-ink">{selected.subscribers}</strong> subscribed voter{selected.subscribers === 1 ? "" : "s"}:{" "}
-            {selected.realSubscribers} real phone{selected.realSubscribers === 1 ? "" : "s"}, {selected.subscribers - selected.realSubscribers} demo contact{selected.subscribers - selected.realSubscribers === 1 ? "" : "s"} (simulated, never dialled).
+            Confam will call <strong className="text-ink">{selected.subscribers}</strong> registered voter{selected.subscribers === 1 ? "" : "s"} at this unit right away.
           </motion.p>
         )}
       </AnimatePresence>
@@ -93,67 +92,111 @@ export function UndoRelocation({ puId }: { puId: string }) {
   );
 }
 
-export function AddPersonForm({ wards, units }: { wards: { id: string; name: string }[]; units: { id: string; name: string; code: string; wardId: string }[] }) {
-  const [state, action, pending] = useActionState(addPerson, null);
-  const [kind, setKind] = useState("verifier");
-  const [wardId, setWardId] = useState("");
-  const wardUnits = units.filter((u) => !wardId || u.wardId === wardId);
+const NEED_OPTIONS = [
+  ["elderly", "Elderly"],
+  ["mobility", "Mobility"],
+  ["low_vision", "Low vision"],
+  ["blind", "Blind"],
+  ["hearing", "Hearing"],
+] as const;
+
+type Unit = { id: string; name: string; code: string };
+
+export function AddVoterForm({ units }: { units: Unit[] }) {
+  const [state, action, pending] = useActionState(addVoter, null);
   return (
-    <form action={action} className="grid gap-4 sm:grid-cols-2">
+    <form action={action} className="grid gap-4 sm:grid-cols-3">
       <label className="block">
         <span className="mb-1 block text-sm font-semibold">Name</span>
-        <input name="displayName" className="field" required autoComplete="off" placeholder="e.g. Mrs Bisi Adeyemi" />
+        <input name="displayName" className="field" required autoComplete="off" placeholder="e.g. Amara Okafor" />
       </label>
       <label className="block">
         <span className="mb-1 block text-sm font-semibold">Phone</span>
         <input name="phone" className="field" required inputMode="tel" autoComplete="off" placeholder="0803 123 4567" />
       </label>
       <label className="block">
-        <span className="mb-1 block text-sm font-semibold">Role</span>
-        <select name="kind" className="field" value={kind} onChange={(e) => setKind(e.target.value)}>
-          <option value="verifier">Verifier (confirms rumours)</option>
-          <option value="official">Presiding officer</option>
-          <option value="supervisor">Ward supervisor</option>
-          <option value="voter">Voter (alerts)</option>
-        </select>
-      </label>
-      <label className="block">
-        <span className="mb-1 block text-sm font-semibold">Ward</span>
-        <select name="wardId" className="field" required value={wardId} onChange={(e) => setWardId(e.target.value)}>
-          <option value="">Choose a ward</option>
-          {wards.map((w) => (
-            <option key={w.id} value={w.id}>{w.name}</option>
+        <span className="mb-1 block text-sm font-semibold">Registered at</span>
+        <select name="puId" className="field" required defaultValue="">
+          <option value="">Choose a polling unit</option>
+          {units.map((u) => (
+            <option key={u.id} value={u.id}>{u.name} ({u.code})</option>
           ))}
         </select>
       </label>
-      {(kind === "official" || kind === "voter") && (
-        <label className="block">
-          <span className="mb-1 block text-sm font-semibold">Polling unit</span>
-          <select name="puId" className="field" required defaultValue="">
-            <option value="">Choose a polling unit</option>
-            {wardUnits.map((u) => (
-              <option key={u.id} value={u.id}>{u.name} ({u.code})</option>
-            ))}
-          </select>
-        </label>
-      )}
-      {kind === "verifier" && (
-        <label className="block">
-          <span className="mb-1 block text-sm font-semibold">Affiliation</span>
-          <select name="affiliation" className="field" defaultValue="community">
-            <option value="community">Community leader</option>
-            <option value="observer">Accredited observer</option>
-            <option value="faith">Faith leader</option>
-            <option value="party_a">Party agent (Party A)</option>
-            <option value="party_b">Party agent (Party B)</option>
-            <option value="party_c">Party agent (Party C)</option>
-            <option value="other">Other</option>
-          </select>
-        </label>
-      )}
-      <div className="sm:col-span-2">
-        <p className="mb-3 text-sm text-muted">In demo mode only the team phones listed in the server configuration are ever dialled. Everyone else is simulated.</p>
-        <Submit pending={pending} idle="Add person" busy="Adding…" />
+      <fieldset className="sm:col-span-3">
+        <legend className="mb-1 text-sm font-semibold">Needs help on election day (optional)</legend>
+        <div className="flex flex-wrap gap-x-5 gap-y-2">
+          {NEED_OPTIONS.map(([v, label]) => (
+            <label key={v} className="inline-flex items-center gap-2 text-[15px]">
+              <input type="checkbox" name="needs" value={v} className="size-4 accent-[var(--violet)]" /> {label}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <div className="sm:col-span-3">
+        <Submit pending={pending} idle="Add to voter list" busy="Adding…" />
+        <Result state={state} />
+      </div>
+    </form>
+  );
+}
+
+export function MoveVoter({ personId, currentPuId, units }: { personId: string; currentPuId: string; units: Unit[] }) {
+  const [target, setTarget] = useState("");
+  const [pending, start] = useTransition();
+  const [state, setState] = useState<ActionState>(null);
+  return (
+    <div className="min-w-[15rem]">
+      <div className="flex gap-2">
+        <select aria-label="Move to polling unit" className="field py-1.5 text-sm" value={target} onChange={(e) => setTarget(e.target.value)}>
+          <option value="">Move to…</option>
+          {units.filter((u) => u.id !== currentPuId).map((u) => (
+            <option key={u.id} value={u.id}>{u.name}</option>
+          ))}
+        </select>
+        <button
+          type="button"
+          className="btn btn-violet shrink-0 py-1.5 text-sm"
+          disabled={!target || pending}
+          onClick={() =>
+            start(async () => {
+              const r = await moveVoter(personId, target);
+              setState(r);
+              if (r?.ok) setTarget("");
+            })
+          }
+        >
+          {pending ? "Moving…" : "Move and call"}
+        </button>
+      </div>
+      <Result state={state} />
+    </div>
+  );
+}
+
+export function AddOfficialForm({ units }: { units: Unit[] }) {
+  const [state, action, pending] = useActionState(addOfficial, null);
+  return (
+    <form action={action} className="grid gap-4 sm:grid-cols-3">
+      <label className="block">
+        <span className="mb-1 block text-sm font-semibold">Name</span>
+        <input name="displayName" className="field" required autoComplete="off" placeholder="e.g. Mr Tunde Bello" />
+      </label>
+      <label className="block">
+        <span className="mb-1 block text-sm font-semibold">Phone</span>
+        <input name="phone" className="field" required inputMode="tel" autoComplete="off" placeholder="0803 123 4567" />
+      </label>
+      <label className="block">
+        <span className="mb-1 block text-sm font-semibold">Presiding officer at</span>
+        <select name="puId" className="field" required defaultValue="">
+          <option value="">Choose a polling unit</option>
+          {units.map((u) => (
+            <option key={u.id} value={u.id}>{u.name} ({u.code})</option>
+          ))}
+        </select>
+      </label>
+      <div className="sm:col-span-3">
+        <Submit pending={pending} idle="Register official" busy="Registering…" />
         <Result state={state} />
       </div>
     </form>
@@ -208,7 +251,7 @@ export function SettingsForm({ s }: { s: { electionDay: boolean; openingDeadline
       </label>
       <label className={`${row} px-5 py-4`}>
         <span>
-          <span className="block font-semibold">Verifiers needed to agree</span>
+          <span className="block font-semibold">Answers needed</span>
           <span className="text-sm text-muted">Independent answers required before a verdict is published automatically.</span>
         </span>
         <input name="verdictMinAnswers" type="number" min={1} max={5} className="field" defaultValue={s.verdictMinAnswers} required />
@@ -223,7 +266,7 @@ export function SettingsForm({ s }: { s: { electionDay: boolean; openingDeadline
       <label className={`${row} px-5 py-4`}>
         <span>
           <span className="block font-semibold">Verification deadline (minutes)</span>
-          <span className="text-sm text-muted">If verifiers don&apos;t agree by then, the rumour is published as unverified.</span>
+          <span className="text-sm text-muted">If no clear answer arrives by then, the rumour is published as unverified.</span>
         </span>
         <input name="caseDeadlineMinutes" type="number" min={2} max={120} className="field" defaultValue={s.caseDeadlineMinutes} required />
       </label>
@@ -237,7 +280,7 @@ export function SettingsForm({ s }: { s: { electionDay: boolean; openingDeadline
       <div className={`${row} px-5 py-4`}>
         <span>
           <span className="block font-semibold">Quiet hours for alerts</span>
-          <span className="text-sm text-muted">Relocation and go-now calls wait until morning (not on election day).</span>
+          <span className="text-sm text-muted">Go-now calls wait until morning (not on election day). INEC notices always go out immediately.</span>
         </span>
         <span className="flex items-center gap-2">
           <input aria-label="Quiet hours start" name="quietStart" type="time" className="field" defaultValue={s.quietStart} required />

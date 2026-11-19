@@ -15,7 +15,7 @@ export default async function Overview() {
   const sentence =
     counters.open === 0
       ? "No rumours are being checked right now."
-      : `${counters.open} rumour${counters.open === 1 ? " is" : "s are"} being checked with verifiers on the ground.`;
+      : `${counters.open} rumour${counters.open === 1 ? " is" : "s are"} being checked with officials on the ground.`;
 
   return (
     <Page>
@@ -31,13 +31,13 @@ export default async function Overview() {
               <>All clear</>
             )}
           </h1>
-          <p className="mt-4 max-w-xl text-lg text-muted">{sentence} Confam answers voters on the phone and calls them back with every verdict.</p>
+          <p className="mt-4 max-w-xl text-lg text-muted">{sentence} Confam asks the official at the polling unit and calls everyone back with the answer.</p>
         </div>
         <dl className="grid grid-cols-3 gap-px overflow-hidden rounded-[10px] border border-line bg-line text-center">
           {[
             ["Calls in (24h)", counters.inboundCalls],
             ["Calls out (24h)", counters.outboundDialled],
-            ["Subscribed voters", counters.subscribers],
+            ["Registered voters", counters.subscribers],
           ].map(([label, n]) => (
             <div key={label} className="bg-surface px-3 py-4">
               <dt className="text-sm text-muted">{label}</dt>
@@ -56,7 +56,7 @@ export default async function Overview() {
         <div className="space-y-6">
           <Panel title="Rumours being checked" aside={<Link href="/rumours" className="link-u text-sm font-semibold">All rumours</Link>}>
             {open.length === 0 ? (
-              <p className="px-5 py-8 text-muted">When a voter reports something Confam hasn&apos;t verified, it appears here while verifiers are called.</p>
+              <p className="px-5 py-8 text-muted">When someone reports something Confam hasn&apos;t verified, it appears here while the official at that polling unit is called.</p>
             ) : (
               <ul className="divide-y divide-line">
                 {open.map((c) => (

@@ -6,9 +6,11 @@ import { motion } from "motion/react";
 
 const ITEMS = [
   { href: "/", label: "Overview" },
+  { href: "/situation", label: "Situation board" },
   { href: "/rumours", label: "Rumours" },
+  { href: "/voters", label: "Voter list" },
+  { href: "/officials", label: "Officials" },
   { href: "/units", label: "Polling units" },
-  { href: "/people", label: "People" },
   { href: "/calls", label: "Calls" },
   { href: "/settings", label: "Settings" },
 ] as const;

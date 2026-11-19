@@ -154,7 +154,7 @@ export async function getWardBoard(): Promise<WardTile[]> {
       (select count(distinct ck.pu_id)::int from checkin ck join polling_unit pu on pu.id = ck.pu_id
          where pu.ward_id = w.id and ck.event in ('arrived','voting_started') and ck.at > now() - interval '18 hours') as arrived,
       (select count(distinct r.pu_id)::int from role r where r.ward_id = w.id and r.kind = 'official' and r.pu_id is not null) as with_officials,
-      (select count(*)::int from subscription s join polling_unit pu on pu.id = s.pu_id where pu.ward_id = w.id and s.active) as subscribers
+      (select count(*)::int from subscription s join polling_unit pu on pu.id = s.pu_id where pu.ward_id = w.id and s.active and s.kind = 'voter') as subscribers
     from ward w order by w.code`);
   return res.rows.map((r) => ({ id: r.id, name: r.name, units: r.units, openCases: r.open_cases, arrived: r.arrived, withOfficials: r.with_officials, subscribers: r.subscribers }));
 }
@@ -167,7 +167,7 @@ export async function getCounters() {
     db().select({ n: count() }).from(call).where(and(eq(call.direction, "inbound"), gte(call.createdAt, since))),
     db().select({ n: count() }).from(outboundAttempt).where(and(eq(outboundAttempt.decision, "dialled"), gte(outboundAttempt.at, since))),
     db().select({ n: count() }).from(outboundAttempt).where(and(eq(outboundAttempt.decision, "error"), gte(outboundAttempt.at, since))),
-    db().select({ n: count() }).from(subscription).where(eq(subscription.active, true)),
+    db().select({ n: count() }).from(subscription).where(and(eq(subscription.active, true), eq(subscription.kind, "voter"))),
   ]);
   return { open: open!.n, published: published!.n, inboundCalls: calls!.n, outboundDialled: outbound!.n, outboundFailed: blocked!.n, subscribers: subs!.n };
 }
@@ -262,9 +262,9 @@ export async function listUnits() {
       relocatedToId: pollingUnit.relocatedToId,
       ward: ward.name,
       wardId: ward.id,
-      subscribers: sql<number>`(select count(*)::int from subscription s where s.pu_id = ${pollingUnit.id} and s.active)`,
+      subscribers: sql<number>`(select count(*)::int from subscription s where s.pu_id = ${pollingUnit.id} and s.active and s.kind = 'voter')`,
       needs: sql<number>`(select count(*)::int from subscription s where s.pu_id = ${pollingUnit.id} and s.active and cardinality(s.needs) > 0)`,
-      realSubscribers: sql<number>`(select count(*)::int from subscription s join person p on p.id = s.person_id where s.pu_id = ${pollingUnit.id} and s.active and not p.is_demo and p.deleted_at is null)`,
+      realSubscribers: sql<number>`(select count(*)::int from subscription s join person p on p.id = s.person_id where s.pu_id = ${pollingUnit.id} and s.active and s.kind = 'voter' and not p.is_demo and p.deleted_at is null)`,
       officials: sql<number>`(select count(*)::int from role r where r.pu_id = ${pollingUnit.id} and r.kind = 'official')`,
     })
     .from(pollingUnit)
@@ -289,25 +289,6 @@ export async function listNotices() {
     .orderBy(desc(notice.createdAt))
     .limit(20);
 }
-
-export async function listPeople() {
-  const people = await db()
-    .select({ id: person.id, name: person.displayName, last4: person.phoneLast4, isDemo: person.isDemo, isTeam: person.isTeam, consentAt: person.consentAt, lang: person.languagePref, createdAt: person.createdAt })
-    .from(person)
-    .where(isNull(person.deletedAt))
-    .orderBy(desc(person.isTeam), person.displayName);
-  const roles = await db()
-    .select({ id: role.id, personId: role.personId, kind: role.kind, ward: ward.name, pu: pollingUnit.name, affiliation: role.affiliation, reputation: role.reputation, hasPin: sql<boolean>`${role.pinHash} is not null` })
-    .from(role)
-    .innerJoin(ward, eq(ward.id, role.wardId))
-    .leftJoin(pollingUnit, eq(pollingUnit.id, role.puId));
-  const subs = await db()
-    .select({ personId: subscription.personId, pu: pollingUnit.name, needs: subscription.needs, active: subscription.active })
-    .from(subscription)
-    .innerJoin(pollingUnit, eq(pollingUnit.id, subscription.puId));
-  return people.map((p) => ({ ...p, roles: roles.filter((r) => r.personId === p.id), subscriptions: subs.filter((s) => s.personId === p.id && s.active) }));
-}
-export type PersonRow = Awaited<ReturnType<typeof listPeople>>[number];
 
 export async function listWardsAndUnits() {
   const [wards, units] = await Promise.all([
@@ -349,3 +330,90 @@ export async function listCalls() {
   return { calls, attempts };
 }
 export type CallRow = Awaited<ReturnType<typeof listCalls>>["calls"][number];
+
+export async function listVoters() {
+  const rows = await db()
+    .select({
+      personId: person.id,
+      subId: subscription.id,
+      name: person.displayName,
+      last4: person.phoneLast4,
+      needs: subscription.needs,
+      puId: pollingUnit.id,
+      pu: pollingUnit.name,
+      puCode: pollingUnit.code,
+      puStatus: pollingUnit.status,
+      createdAt: subscription.createdAt,
+      lastAlert: sql<string | null>`(select a.status || '|' || a.kind || '|' || to_char(a.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') from alert a where a.person_id = ${person.id} order by a.created_at desc limit 1)`,
+    })
+    .from(subscription)
+    .innerJoin(person, eq(person.id, subscription.personId))
+    .innerJoin(pollingUnit, eq(pollingUnit.id, subscription.puId))
+    .where(and(eq(subscription.active, true), eq(subscription.kind, "voter"), isNull(person.deletedAt)))
+    .orderBy(person.displayName);
+  return rows.map((r) => {
+    const [status, kind, at] = (r.lastAlert ?? "").split("|");
+    return { ...r, lastAlert: r.lastAlert ? { status: status!, kind: kind!, at: new Date(at!) } : null };
+  });
+}
+export type VoterRow = Awaited<ReturnType<typeof listVoters>>[number];
+
+export async function listAssistanceRequests() {
+  return db()
+    .select({ id: subscription.id, name: person.displayName, last4: person.phoneLast4, needs: subscription.needs, pu: pollingUnit.name, createdAt: subscription.createdAt, goNowSentAt: subscription.goNowSentAt })
+    .from(subscription)
+    .innerJoin(person, eq(person.id, subscription.personId))
+    .innerJoin(pollingUnit, eq(pollingUnit.id, subscription.puId))
+    .where(and(eq(subscription.active, true), sql`cardinality(${subscription.needs}) > 0`, isNull(person.deletedAt)))
+    .orderBy(desc(subscription.createdAt));
+}
+
+export async function listOfficials() {
+  const rows = await db()
+    .select({
+      roleId: role.id,
+      personId: person.id,
+      name: person.displayName,
+      last4: person.phoneLast4,
+      kind: role.kind,
+      puId: role.puId,
+      pu: pollingUnit.name,
+      puCode: pollingUnit.code,
+      ward: ward.name,
+      hasPin: sql<boolean>`${role.pinHash} is not null`,
+      locked: sql<boolean>`${role.pinLockedUntil} is not null and ${role.pinLockedUntil} > now()`,
+    })
+    .from(role)
+    .innerJoin(person, eq(person.id, role.personId))
+    .innerJoin(ward, eq(ward.id, role.wardId))
+    .leftJoin(pollingUnit, eq(pollingUnit.id, role.puId))
+    .where(and(inArray(role.kind, ["official", "supervisor"]), isNull(person.deletedAt)))
+    .orderBy(role.kind, pollingUnit.code);
+  const latest = await db().execute<{ pu_id: string; event: string; at: Date; eta_minutes: number | null }>(sql`
+    select distinct on (pu_id) pu_id, event, at, eta_minutes from checkin where at > now() - interval '18 hours' order by pu_id, at desc`);
+  const byPu = new Map(latest.rows.map((r) => [r.pu_id, r]));
+  return rows.map((r) => {
+    const l = r.puId ? byPu.get(r.puId) : undefined;
+    return { ...r, latest: l ? { event: l.event, at: new Date(l.at), eta: l.eta_minutes } : null };
+  });
+}
+export type OfficialRow = Awaited<ReturnType<typeof listOfficials>>[number];
+
+/** Everything Confam currently "knows" and will answer instantly, with when each answer stops being reused. */
+export async function getSituation() {
+  const [facts, open, checkins] = await Promise.all([
+    db()
+      .select({ id: fact.id, caseId: fact.caseId, category: fact.category, claim: fact.claimEn, verdict: fact.verdict, validUntil: fact.validUntil, createdAt: fact.createdAt, scriptEn: fact.scriptEn, pu: pollingUnit.name, ward: ward.name })
+      .from(fact)
+      .leftJoin(pollingUnit, eq(pollingUnit.id, fact.puId))
+      .leftJoin(ward, eq(ward.id, fact.wardId))
+      .where(and(isNull(fact.supersededAt), sql`${fact.validUntil} > now()`))
+      .orderBy(desc(fact.createdAt)),
+    listCases("verifying"),
+    db().execute<{ pu_id: string; name: string; code: string; event: string; at: Date; eta_minutes: number | null; note: string | null }>(sql`
+      select distinct on (c.pu_id) c.pu_id, pu.name, pu.code, c.event, c.at, c.eta_minutes, c.note
+      from checkin c join polling_unit pu on pu.id = c.pu_id
+      where c.at > now() - interval '18 hours' order by c.pu_id, c.at desc`),
+  ]);
+  return { facts, open, checkins: checkins.rows.map((r) => ({ ...r, at: new Date(r.at) })) };
+}

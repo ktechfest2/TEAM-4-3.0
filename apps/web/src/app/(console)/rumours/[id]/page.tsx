@@ -40,7 +40,7 @@ export default async function RumourDetail({ params }: PageProps<"/rumours/[id]"
           ) : (
             <div className="rounded-[10px] border border-line bg-surface px-5 py-4">
               <p className="font-display text-2xl font-bold uppercase text-warn">Checking</p>
-              <p className="text-sm text-muted">Deadline {lagosTime(c.deadlineAt)} (Lagos). Verdict lands automatically when 2+ verifiers agree.</p>
+              <p className="text-sm text-muted">Deadline {lagosTime(c.deadlineAt)} (Lagos). The verdict lands automatically as soon as the official answers.</p>
             </div>
           )}
         </div>
@@ -48,9 +48,9 @@ export default async function RumourDetail({ params }: PageProps<"/rumours/[id]"
 
       <div className="grid gap-6 xl:grid-cols-[1.3fr_1fr]">
         <div className="space-y-6">
-          <Panel title="Verifiers called" aside={<span className="text-sm text-muted">{requests.filter((r) => r.status === "answered").length} of {requests.length} answered</span>}>
+          <Panel title="Officials called" aside={<span className="text-sm text-muted">{requests.filter((r) => r.status === "answered").length} of {requests.length} answered</span>}>
             {requests.length === 0 ? (
-              <p className="px-5 py-6 text-muted">No verifiers yet. They are chosen from the ward first, then the rest of the LGA.</p>
+              <p className="px-5 py-6 text-muted">No one called yet. Confam calls the presiding officer at this polling unit first, then officials nearby.</p>
             ) : (
               <ul className="divide-y divide-line">
                 {requests.map((r) => (
@@ -58,7 +58,7 @@ export default async function RumourDetail({ params }: PageProps<"/rumours/[id]"
                     <div className="min-w-0">
                       <p className="font-semibold">{r.name} <span className="font-mono text-sm font-normal text-muted">{mask(r.last4)}</span></p>
                       <p className="text-sm text-muted">
-                        {r.affiliation ? titleCase(r.affiliation.replace("_", " ")) : "Unaffiliated"}, weight {r.weight.toFixed(1)}
+                        {r.affiliation ? titleCase(r.affiliation.replace("_", " ")) : "Polling official"}
                         {r.attempts > 1 ? `, ${r.attempts} attempts` : ""}
                       </p>
                       {r.detail && <p className="mt-1 text-[15px]">&ldquo;{r.detail}&rdquo;</p>}

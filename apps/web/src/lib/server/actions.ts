@@ -1,6 +1,6 @@
 "use server";
 
-import { randomInt } from "node:crypto";
+import { randomInt, randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { and, eq } from "drizzle-orm";
@@ -146,46 +146,103 @@ export async function undoRelocation(puId: string): Promise<ActionState> {
 
 // ---------- people ----------
 
-const PersonSchema = z.object({
-  displayName: z.string().trim().min(2, "Enter a name").max(80),
-  phone: z.string().trim().min(7, "Enter a phone number"),
-  kind: z.enum(["verifier", "official", "supervisor", "voter"]),
-  wardId: z.string().uuid("Choose a ward"),
-  puId: z.string().uuid().optional().or(z.literal("")),
-  affiliation: z.enum(["community", "observer", "faith", "party_a", "party_b", "party_c", "other"]).optional().or(z.literal("")),
-});
+const NEEDS = ["elderly", "mobility", "low_vision", "blind", "hearing", "other"] as const;
 
-export async function addPerson(_prev: ActionState, form: FormData): Promise<ActionState> {
-  await requireAdmin();
-  const parsed = PersonSchema.safeParse(Object.fromEntries(form.entries()));
-  if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Check the form.");
-  const d = parsed.data;
-  let e164: string;
+function parsePhone(raw: string): { ok: true; e164: string } | { ok: false; message: string } {
   try {
-    e164 = normalizePhone(d.phone);
+    return { ok: true, e164: normalizePhone(raw) };
   } catch (err) {
-    return fail(err instanceof PhoneError ? "That phone number doesn't look right. Use 080… or +234…" : "Invalid phone number.");
+    return { ok: false, message: err instanceof PhoneError ? "That phone number doesn't look right. Use 080… or +234…" : "Invalid phone number." };
   }
-  if ((d.kind === "official" || d.kind === "voter") && !d.puId) return fail("Officials and voters need a polling unit.");
+}
+
+/** Create (or revive) a person by phone. Existing people keep their record; the name is updated. */
+async function upsertPerson(displayName: string, e164: string) {
   const crypto = getCrypto();
-  const { db, pool } = getDb();
-  const allow = new Set((process.env.DEMO_TEAM_PHONES ?? "").split(",").map((s) => s.trim()).filter(Boolean).map((p) => { try { return normalizePhone(p); } catch { return ""; } }));
+  const { db } = getDb();
   const [p] = await db
     .insert(person)
-    .values({ displayName: d.displayName, phoneHash: crypto.hash(e164), phoneEnc: crypto.encrypt(e164), phoneLast4: e164.slice(-4), isTeam: allow.has(e164), consentAt: d.kind === "voter" ? new Date() : null })
-    .onConflictDoUpdate({ target: person.phoneHash, set: { displayName: d.displayName, deletedAt: null, phoneEnc: crypto.encrypt(e164) } })
+    .values({ displayName, phoneHash: crypto.hash(e164), phoneEnc: crypto.encrypt(e164), phoneLast4: e164.slice(-4), isTeam: true })
+    .onConflictDoUpdate({ target: person.phoneHash, set: { displayName, deletedAt: null, isDemo: false, phoneEnc: crypto.encrypt(e164) } })
     .returning({ id: person.id });
-  let secret: string | undefined;
-  if (d.kind === "voter") {
-    await db.insert(subscription).values({ personId: p!.id, puId: d.puId! }).onConflictDoUpdate({ target: [subscription.personId, subscription.puId], set: { active: true } });
-  } else {
-    const pin = d.kind === "official" ? String(randomInt(0, 10_000)).padStart(4, "0") : null;
-    await db.insert(role).values({ personId: p!.id, kind: d.kind, wardId: d.wardId, puId: d.puId || null, affiliation: d.affiliation || null, pinHash: pin ? await hashSecret(pin) : null });
-    if (pin) secret = pin;
-  }
-  await notify(pool, { type: "person", id: p!.id });
-  revalidatePath("/people");
-  return { ok: true, message: secret ? `Added ${d.displayName}. Their check-in PIN is shown once below.` : `Added ${d.displayName}.`, secret };
+  return p!.id;
+}
+
+const VoterSchema = z.object({
+  displayName: z.string().trim().min(2, "Enter the voter's name").max(80),
+  phone: z.string().trim().min(7, "Enter a phone number"),
+  puId: z.string().uuid("Choose the polling unit they are registered at"),
+});
+
+/** Register a voter on the INEC voter list (one polling unit per voter). */
+export async function addVoter(_prev: ActionState, form: FormData): Promise<ActionState> {
+  await requireAdmin();
+  const parsed = VoterSchema.safeParse({ displayName: form.get("displayName"), phone: form.get("phone"), puId: form.get("puId") });
+  if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Check the form.");
+  const needs = form.getAll("needs").map(String).filter((n): n is (typeof NEEDS)[number] => (NEEDS as readonly string[]).includes(n));
+  const phone = parsePhone(parsed.data.phone);
+  if (!phone.ok) return fail(phone.message);
+  const { db, pool } = getDb();
+  const personId = await upsertPerson(parsed.data.displayName, phone.e164);
+  await db.update(person).set({ consentAt: new Date() }).where(eq(person.id, personId));
+  await db.update(subscription).set({ active: false }).where(and(eq(subscription.personId, personId), eq(subscription.kind, "voter")));
+  await db
+    .insert(subscription)
+    .values({ personId, puId: parsed.data.puId, kind: "voter", needs })
+    .onConflictDoUpdate({ target: [subscription.personId, subscription.puId], set: { kind: "voter", active: true, needs } });
+  await notify(pool, { type: "person", id: personId });
+  revalidatePath("/voters");
+  return { ok: true, message: `${parsed.data.displayName} is now on the voter list. They can call Confam to check their polling unit and will be called if it changes.` };
+}
+
+/** INEC moves ONE voter to another polling unit: update the register and call them straight away. */
+export async function moveVoter(personId: string, newPuId: string): Promise<ActionState> {
+  await requireAdmin();
+  if (!z.string().uuid().safeParse(personId).success || !z.string().uuid().safeParse(newPuId).success) return fail("Choose the new polling unit.");
+  const { db, pool } = getDb();
+  const [current] = await db
+    .select({ id: subscription.id, puId: subscription.puId, needs: subscription.needs })
+    .from(subscription)
+    .where(and(eq(subscription.personId, personId), eq(subscription.kind, "voter"), eq(subscription.active, true)))
+    .limit(1);
+  if (!current) return fail("This person is not on the voter list.");
+  if (current.puId === newPuId) return fail("They are already registered at that polling unit.");
+  const [to] = await db.select({ name: pollingUnit.name }).from(pollingUnit).where(eq(pollingUnit.id, newPuId));
+  if (!to) return fail("That polling unit no longer exists.");
+  await db.transaction(async (tx) => {
+    // A row for the new unit may exist (e.g. an old assistance request); remove it so the voter row can move there.
+    await tx.delete(subscription).where(and(eq(subscription.personId, personId), eq(subscription.puId, newPuId)));
+    await tx.update(subscription).set({ puId: newPuId, goNowSentAt: null }).where(eq(subscription.id, current.id));
+  });
+  await sendJob(QUEUES.alertTransfer, { personId, fromPuId: current.puId, toPuId: newPuId, transferId: randomUUID() });
+  await notify(pool, { type: "person", id: personId });
+  revalidatePath("/voters");
+  return { ok: true, message: `Moved to ${to.name}. Confam is calling them now.` };
+}
+
+const OfficialSchema = z.object({
+  displayName: z.string().trim().min(2, "Enter the official's name").max(80),
+  phone: z.string().trim().min(7, "Enter a phone number"),
+  puId: z.string().uuid("Choose the polling unit they run"),
+});
+
+/** Register a presiding officer. Only numbers registered here are recognised as officials by the phone agent. */
+export async function addOfficial(_prev: ActionState, form: FormData): Promise<ActionState> {
+  await requireAdmin();
+  const parsed = OfficialSchema.safeParse({ displayName: form.get("displayName"), phone: form.get("phone"), puId: form.get("puId") });
+  if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Check the form.");
+  const phone = parsePhone(parsed.data.phone);
+  if (!phone.ok) return fail(phone.message);
+  const { db, pool } = getDb();
+  const [pu] = await db.select({ wardId: pollingUnit.wardId, name: pollingUnit.name }).from(pollingUnit).where(eq(pollingUnit.id, parsed.data.puId));
+  if (!pu) return fail("That polling unit no longer exists.");
+  const personId = await upsertPerson(parsed.data.displayName, phone.e164);
+  const pin = String(randomInt(0, 10_000)).padStart(4, "0");
+  await db.delete(role).where(and(eq(role.personId, personId), eq(role.kind, "official")));
+  await db.insert(role).values({ personId, kind: "official", wardId: pu.wardId, puId: parsed.data.puId, pinHash: await hashSecret(pin) });
+  await notify(pool, { type: "person", id: personId });
+  revalidatePath("/officials");
+  return { ok: true, message: `${parsed.data.displayName} is now the presiding officer for ${pu.name}. Share this check-in PIN privately; it is shown once.`, secret: pin };
 }
 
 export async function resetPin(roleId: string): Promise<ActionState> {
@@ -198,7 +255,7 @@ export async function resetPin(roleId: string): Promise<ActionState> {
     .where(and(eq(role.id, roleId), eq(role.kind, "official")))
     .returning({ id: role.id });
   if (res.length === 0) return fail("Only polling officials have PINs.");
-  revalidatePath("/people");
+  revalidatePath("/officials");
   return { ok: true, message: "New PIN issued. Share it with the official privately; it is shown once.", secret: pin };
 }
 
@@ -208,7 +265,10 @@ export async function removePerson(personId: string): Promise<ActionState> {
   const { db, pool } = getDb();
   // Soft delete and crypto-shred the number: the encrypted phone is overwritten so it can never be dialled again.
   await db.update(person).set({ deletedAt: new Date(), phoneEnc: "deleted", consentAt: null }).where(eq(person.id, personId));
+  await db.update(subscription).set({ active: false }).where(eq(subscription.personId, personId));
+  await db.delete(role).where(eq(role.personId, personId));
   await notify(pool, { type: "person", id: personId });
-  revalidatePath("/people");
+  revalidatePath("/voters");
+  revalidatePath("/officials");
   return { ok: true, message: "Removed. Their number has been erased and will never be called." };
 }

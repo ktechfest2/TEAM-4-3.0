@@ -31,7 +31,7 @@ test("overview shows wards, live status and navigation", async ({ page }) => {
   await expect(page.getByText("Yaba / Ojuelegba")).toBeVisible();
   await expect(page.getByRole("status").filter({ hasText: /Live|Connecting|Reconnecting/ })).toBeVisible();
   await expect(page.getByRole("status").filter({ hasText: "Live" })).toBeVisible({ timeout: 10_000 });
-  for (const [label, url] of [["Rumours", /\/rumours$/], ["Polling units", /\/units$/], ["People", /\/people$/], ["Calls", /\/calls$/], ["Settings", /\/settings$/]] as const) {
+  for (const [label, url] of [["Situation board", /\/situation$/], ["Rumours", /\/rumours$/], ["Voter list", /\/voters$/], ["Officials", /\/officials$/], ["Polling units", /\/units$/], ["Calls", /\/calls$/], ["Settings", /\/settings$/]] as const) {
     await page.getByRole("navigation", { name: "Control room" }).getByRole("link", { name: label }).click();
     await expect(page).toHaveURL(url);
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
@@ -55,13 +55,13 @@ test("pause switch holds and resumes outbound calls", async ({ page }) => {
 test("relocation notice previews recipients, issues while paused, and can be undone", async ({ page }) => {
   test.skip(!PASSWORD, "ADMIN_PASSWORD not set");
   await signIn(page);
-  // Pause first so this test never dials anyone.
+  // Pause first so this test never dials anyone (the unit has no registered voters anyway).
   await page.getByRole("switch").click();
   await expect(page.getByRole("switch")).toHaveAttribute("aria-checked", "false");
   try {
   await page.goto("/units");
   await page.getByLabel("Polling unit that moved").selectOption({ label: "National Stadium Gate B (LA-SUR-06-001)" });
-  await expect(page.getByText(/Confam will call/)).toContainText("demo contact");
+  await expect(page.getByText(/Confam will call/)).toContainText("registered voter");
   await page.getByLabel("New location").selectOption({ label: "Igbaja Community Hall (LA-SUR-06-002)" });
   await page.getByRole("button", { name: "Issue notice and call voters" }).click();
   await expect(page.getByRole("status").filter({ hasText: "Notice issued" })).toBeVisible();
@@ -83,16 +83,23 @@ test("settings validate and save", async ({ page }) => {
   await expect(page.getByRole("status").filter({ hasText: "Settings saved." })).toBeVisible();
 });
 
-test("people form rejects a bad phone number", async ({ page }) => {
+test("voter and official forms validate phone numbers", async ({ page }) => {
   test.skip(!PASSWORD, "ADMIN_PASSWORD not set");
   await signIn(page);
-  await page.goto("/people");
-  await page.getByLabel("Name").fill("Test Person");
-  await page.getByLabel("Phone").fill("12ab");
-  await page.getByRole("combobox", { name: "Ward", exact: true }).selectOption({ label: "COKER" });
-  await page.getByRole("button", { name: "Add person" }).click();
+  await page.goto("/voters");
+  const voterForm = page.locator("form").filter({ has: page.getByRole("button", { name: "Add to voter list" }) });
+  await voterForm.getByLabel("Name").fill("Test Voter");
+  await voterForm.getByLabel("Phone").fill("12ab");
+  await voterForm.getByLabel("Registered at").selectOption({ label: "Coker Primary School (LA-SUR-10-001)" });
+  await voterForm.getByRole("button", { name: "Add to voter list" }).click();
   await expect(page.getByRole("status").filter({ hasText: /phone/i })).toBeVisible();
-  await expect(page.getByText("Team phone").first()).toBeVisible();
+  await page.goto("/officials");
+  const officialForm = page.locator("form").filter({ has: page.getByRole("button", { name: "Register official" }) });
+  await officialForm.getByLabel("Name").fill("Test Official");
+  await officialForm.getByLabel("Phone").fill("not a number");
+  await officialForm.getByLabel("Presiding officer at").selectOption({ label: "Coker Primary School (LA-SUR-10-001)" });
+  await officialForm.getByRole("button", { name: "Register official" }).click();
+  await expect(page.getByRole("status").filter({ hasText: /phone/i })).toBeVisible();
 });
 
 test("every signed-in page renders without console errors, failed requests or horizontal overflow", async ({ page }) => {
@@ -108,7 +115,7 @@ test("every signed-in page renders without console errors, failed requests or ho
     if (r.status() >= 400 && url.startsWith("http://localhost") && !url.includes("/api/stream")) problems.push(`HTTP ${r.status()} ${url}`);
   });
   await signIn(page);
-  for (const path of ["/", "/rumours", "/rumours?status=verifying", "/rumours?status=published", "/units", "/people", "/calls", "/settings"]) {
+  for (const path of ["/", "/situation", "/rumours", "/rumours?status=verifying", "/rumours?status=published", "/voters", "/officials", "/units", "/calls", "/settings"]) {
     await page.goto(path);
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     await page.waitForTimeout(600);

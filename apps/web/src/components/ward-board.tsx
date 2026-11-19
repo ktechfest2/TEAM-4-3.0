@@ -38,7 +38,7 @@ export function WardBoard({ wards, electionDay }: { wards: WardTileData[]; elect
               {w.openCases > 0 ? (
                 <span className="rounded-[4px] bg-warn px-1.5 font-semibold text-surface">{w.openCases} checking</span>
               ) : (
-                <span className="text-muted">{w.subscribers} subscribed</span>
+                <span className="text-muted">{w.subscribers} voter{w.subscribers === 1 ? "" : "s"}</span>
               )}
             </div>
             <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-surface-2" aria-label={`${w.arrived} of ${w.withOfficials} units with officials arrived`}>
