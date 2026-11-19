@@ -120,6 +120,48 @@ describe("caller number fast path", () => {
   });
 });
 
+describe("Nigerian caller ID with the trunk 0 (+2340…)", () => {
+  const NG_VOTER = "+2349012345678";
+  const NG_VOTER_AS_PRESENTED = "+23409012345678"; // how Nigerian networks often present it
+  it("recognises a registered voter and calls the reporter back on the correct number", async () => {
+    const { person: personTable, subscription: subTable } = await import("@confam/db");
+    const [p] = await env.deps.db
+      .insert(personTable)
+      .values({ displayName: "Amara", phoneHash: env.crypto.hash(NG_VOTER), phoneEnc: env.crypto.encrypt(NG_VOTER), phoneLast4: "5678" })
+      .returning();
+    await env.deps.db.insert(subTable).values({ personId: p!.id, puId: (await pu("LA-SUR-05-001")).id, kind: "voter" });
+    const v = await tool("my_polling_unit", {}, { callId: env.aethex.addInbound(NG_VOTER_AS_PRESENTED) });
+    expect(v.body.on_voter_list).toBe(true);
+
+    const r = await tool("report_claim", { claim_en: "Vote buying at Ojuelegba", category: "vote_buying", place: "Ojuelegba primary school" }, { callId: env.aethex.addInbound(NG_VOTER_AS_PRESENTED) });
+    env.jobs.take(QUEUES.caseAggregate);
+    await env.jobs.drain(env.deps, [QUEUES.caseVerify, QUEUES.dial]);
+    const [vr] = await env.deps.db.select().from(verificationRequest).where(eq(verificationRequest.caseId, r.body.case_id));
+    await tool("record_verifier_answer", { answer: "no" }, { agent: "verifier", callId: vr!.aethexCallId! });
+    await env.jobs.drain(env.deps, [QUEUES.caseAggregate, QUEUES.alertCase, QUEUES.dial]);
+    const callback = env.aethex.triggered.find((t) => t.agent_id === AGENTS.alert);
+    expect(callback?.to_number).toBe(NG_VOTER);
+  });
+  it("repairs and merges a duplicate saved before the fix", async () => {
+    const { person: personTable, report: reportTable, repairPhoneNumbers } = await import("@confam/db");
+    const [good] = await env.deps.db
+      .insert(personTable)
+      .values({ displayName: "Amara", phoneHash: env.crypto.hash(NG_VOTER), phoneEnc: env.crypto.encrypt(NG_VOTER), phoneLast4: "5678" })
+      .returning();
+    const [dup] = await env.deps.db
+      .insert(personTable)
+      .values({ displayName: "Caller ••5678", phoneHash: env.crypto.hash(NG_VOTER_AS_PRESENTED), phoneEnc: env.crypto.encrypt(NG_VOTER_AS_PRESENTED), phoneLast4: "5678" })
+      .returning();
+    const r = await tool("report_claim", { claim_en: "Vote buying at Coker", category: "vote_buying", place: "Coker primary school" }, { callId: env.aethex.addInbound(PUBLIC) });
+    await env.deps.db.update(reportTable).set({ personId: dup!.id }).where(eq(reportTable.caseId, r.body.case_id));
+    expect(await repairPhoneNumbers(env.deps.db, env.crypto)).toBeGreaterThanOrEqual(1);
+    const [rep] = await env.deps.db.select().from(reportTable).where(eq(reportTable.caseId, r.body.case_id));
+    expect(rep!.personId).toBe(good!.id);
+    const [d] = await env.deps.db.select().from(personTable).where(eq(personTable.id, dup!.id));
+    expect(d!.deletedAt).not.toBeNull();
+  });
+});
+
 describe("who is calling", () => {
   it("identifies officials, voters and the public", async () => {
     expect((await tool("identify_caller", {}, { callId: env.aethex.addInbound(OFFICIAL) })).body.caller_type).toBe("official");

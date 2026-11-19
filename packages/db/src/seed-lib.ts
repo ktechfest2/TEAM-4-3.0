@@ -21,6 +21,7 @@ export interface SeedResult {
   people: number;
   created: string[];
   retiredDemoContacts: number;
+  repairedNumbers: number;
   generatedOfficialPin?: string;
 }
 
@@ -51,6 +52,8 @@ export async function seed(db: Db, crypto: PhoneCrypto, opts: SeedOptions): Prom
       .returning({ id: pollingUnit.id, wardId: pollingUnit.wardId, name: pollingUnit.name });
     puIds.set(pu.code, row!);
   }
+
+  const repairedNumbers = await repairPhoneNumbers(db, crypto);
 
   // Retire legacy fake contacts so nothing in the system is pretend.
   const retired = await db
@@ -121,5 +124,45 @@ export async function seed(db: Db, crypto: PhoneCrypto, opts: SeedOptions): Prom
       sql`select (select count(*)::int from ward) as wards, (select count(*)::int from polling_unit) as pus, (select count(*)::int from person where deleted_at is null) as people`,
     )
     .then((r) => r.rows);
-  return { wards: counts!.wards, pollingUnits: counts!.pus, people: counts!.people, created, retiredDemoContacts: retired.length, generatedOfficialPin };
+  return { wards: counts!.wards, pollingUnits: counts!.pus, people: counts!.people, created, retiredDemoContacts: retired.length, repairedNumbers, generatedOfficialPin };
+}
+
+/**
+ * Re-normalise every stored number (e.g. Nigerian caller IDs saved as +2340… before the trunk-prefix fix).
+ * If the corrected number already belongs to someone else, the duplicate is merged into that person.
+ */
+export async function repairPhoneNumbers(db: Db, crypto: PhoneCrypto): Promise<number> {
+  const people = await db.select({ id: person.id, phoneEnc: person.phoneEnc, phoneHash: person.phoneHash }).from(person).where(isNull(person.deletedAt));
+  let repaired = 0;
+  for (const p of people) {
+    let raw: string;
+    try {
+      raw = crypto.decrypt(p.phoneEnc);
+    } catch {
+      continue;
+    }
+    let fixed: string;
+    try {
+      fixed = normalizePhone(raw);
+    } catch {
+      continue;
+    }
+    const hash = crypto.hash(fixed);
+    if (hash === p.phoneHash) continue;
+    const [owner] = await db.select({ id: person.id }).from(person).where(and(eq(person.phoneHash, hash), sql`${person.id} <> ${p.id}`)).limit(1);
+    if (owner) {
+      // Merge the duplicate into the existing person: move history, then retire the duplicate.
+      for (const table of ["report", "alert", "outbound_attempt", "call", "checkin", "verification_request"]) {
+        await db.execute(sql`update ${sql.identifier(table)} set person_id = ${owner.id} where person_id = ${p.id}`);
+      }
+      await db.execute(sql`delete from subscription d using subscription k where d.person_id = ${p.id} and k.person_id = ${owner.id} and k.pu_id = d.pu_id`);
+      await db.execute(sql`update subscription set person_id = ${owner.id} where person_id = ${p.id}`);
+      await db.execute(sql`update role set person_id = ${owner.id} where person_id = ${p.id}`);
+      await db.update(person).set({ deletedAt: new Date(), phoneEnc: "deleted", phoneHash: `merged:${p.id}` }).where(eq(person.id, p.id));
+    } else {
+      await db.update(person).set({ phoneHash: hash, phoneEnc: crypto.encrypt(fixed), phoneLast4: fixed.slice(-4) }).where(eq(person.id, p.id));
+    }
+    repaired++;
+  }
+  return repaired;
 }

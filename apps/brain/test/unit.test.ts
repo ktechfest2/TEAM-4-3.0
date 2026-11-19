@@ -100,6 +100,9 @@ describe("phones", () => {
     expect(normalizePhone("0701 234 5678")).toBe("+2347012345678");
     expect(normalizePhone("2347012345678")).toBe("+2347012345678");
     expect(normalizePhone("+1 (864) 808-9401")).toBe("+18648089401");
+    // Nigerian caller IDs often keep the trunk 0 after the country code
+    expect(normalizePhone("+23407012345678")).toBe("+2347012345678");
+    expect(normalizePhone("23409012345678")).toBe("+2349012345678");
     expect(() => normalizePhone("hello")).toThrow();
   });
   it("encrypts reversibly and hashes deterministically", () => {

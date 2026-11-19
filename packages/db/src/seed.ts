@@ -11,7 +11,7 @@ try {
     voterPhones: list(process.env.DEMO_VOTER_PHONES),
     officialPin: process.env.DEMO_OFFICIAL_PIN,
   });
-  console.log(`seeded: ${r.wards} wards, ${r.pollingUnits} polling units, ${r.people} people; retired ${r.retiredDemoContacts} demo contacts`);
+  console.log(`seeded: ${r.wards} wards, ${r.pollingUnits} polling units, ${r.people} people; retired ${r.retiredDemoContacts} demo contacts; repaired ${r.repairedNumbers} numbers`);
   for (const c of r.created) console.log(`  created ${c}`);
   if (r.generatedOfficialPin) console.log(`official PIN (shown once; set DEMO_OFFICIAL_PIN to choose): ${r.generatedOfficialPin}`);
 } finally {

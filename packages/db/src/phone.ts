@@ -19,6 +19,8 @@ export function normalizePhone(input: string): string {
   else if (/^0[789]\d{9}$/.test(trimmed)) digits = `234${trimmed.slice(1)}`;
   else if (/^[789]\d{9}$/.test(trimmed)) digits = `234${trimmed}`;
   else digits = trimmed;
+  // Nigerian networks often present caller ID as +234 0XXX… (keeping the national trunk "0"): drop it.
+  if (/^2340[789]\d{9}$/.test(digits)) digits = `234${digits.slice(4)}`;
   if (!/^[1-9]\d{7,14}$/.test(digits)) throw new PhoneError(`invalid phone number`);
   return `+${digits}`;
 }
