@@ -248,6 +248,7 @@ describe("rumours verified by the official on the ground", () => {
 
 describe("elderly and disability support (open to anyone)", () => {
   it("records a public caller's needs, alerts the official at check-in, and calls them to go", async () => {
+    await env.deps.db.update(systemSettings).set({ electionDay: true }); // go-now calls respect quiet hours otherwise
     const elder = "+2348030000050";
     const s = await tool("request_accessibility_support", { polling_unit: "Ojuelegba Primary School I", needs: ["elderly", "mobility"], consent: true }, { callId: env.aethex.addInbound(elder) });
     expect(s.body.ok).toBe(true);
@@ -373,6 +374,20 @@ describe("aethex webhooks", () => {
     const retry = env.jobs.jobs.find((j) => j.name === QUEUES.dial);
     expect(retry?.data.attempt).toBe(2);
     expect(retry?.options?.startAfter).toBe(60);
+  });
+
+  it("takes the official's answer from the transcript if the agent failed to record it", async () => {
+    const r = await tool("report_claim", { claim_en: "Fighting at Ojuelegba", category: "vote_buying", place: "Ojuelegba primary school" }, { callId: env.aethex.addInbound(PUBLIC) });
+    env.jobs.take(QUEUES.caseAggregate);
+    await env.jobs.drain(env.deps, [QUEUES.caseVerify, QUEUES.dial]);
+    const [vr] = await env.deps.db.select().from(verificationRequest).where(eq(verificationRequest.caseId, r.body.case_id));
+    await post({
+      event_id: "evt_tr", call_id: vr!.aethexCallId, status: "completed", direction: "outbound", from_number: "+18648089401", to_number: OFFICIAL, duration_seconds: 20,
+      transcript: [{ role: "assistant", content: "A voter reported vote buying near Ojuelegba. Is that true right now?" }, { role: "user", content: "No, nothing like that is happening." }],
+    });
+    await env.jobs.drain(env.deps, [QUEUES.webhook, QUEUES.caseAggregate]);
+    const [c] = await env.deps.db.select().from(claimCase).where(eq(claimCase.id, r.body.case_id));
+    expect(c).toMatchObject({ status: "published", verdict: "false" });
   });
 
   it("starts checking a rumour as soon as the reporter hangs up, and never double-dials the official", async () => {

@@ -43,7 +43,6 @@ const voice = (name: string) => {
   if (!v) throw new Error(`voice ${name} not found`);
   return v.id;
 };
-const MALE = voice(process.env.CONFAM_VOICE_MALE ?? "Segun");
 const FEMALE = voice(process.env.CONFAM_VOICE_FEMALE ?? "Ifeoma");
 
 const common = {
@@ -66,7 +65,7 @@ const common = {
 
 const SPECS: Record<AgentKey, Record<string, unknown>> = {
   hotline: { ...common, name: "confam-hotline", system_prompt: HOTLINE_PROMPT, messaging_system_prompt: HOTLINE_PROMPT, first_message: FIRST_MESSAGES.hotline, voice_id: FEMALE, max_duration_seconds: 600, idle_check_in_after_secs: 12 },
-  verifier: { ...common, name: "confam-verifier", system_prompt: VERIFIER_PROMPT, messaging_system_prompt: VERIFIER_PROMPT, first_message: FIRST_MESSAGES.verifier, voice_id: MALE, max_duration_seconds: 240, script_adherence: "strict" },
+  verifier: { ...common, name: "confam-verifier", system_prompt: VERIFIER_PROMPT, messaging_system_prompt: VERIFIER_PROMPT, first_message: FIRST_MESSAGES.verifier, voice_id: FEMALE, max_duration_seconds: 180, script_adherence: "strict" },
   alert: {
     ...common,
     name: "confam-alert",
@@ -79,7 +78,7 @@ const SPECS: Record<AgentKey, Record<string, unknown>> = {
     voicemail_action: "leave_message",
     voicemail_message: VOICEMAIL_MESSAGE,
   },
-  official: { ...common, name: "confam-official", system_prompt: OFFICIAL_PROMPT, messaging_system_prompt: OFFICIAL_PROMPT, first_message: FIRST_MESSAGES.official, voice_id: MALE, max_duration_seconds: 300 },
+  official: { ...common, name: "confam-official", system_prompt: OFFICIAL_PROMPT, messaging_system_prompt: OFFICIAL_PROMPT, first_message: FIRST_MESSAGES.official, voice_id: FEMALE, max_duration_seconds: 300 },
 };
 
 function toolSchema(schema: z.ZodType): unknown {

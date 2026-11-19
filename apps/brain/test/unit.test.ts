@@ -5,6 +5,7 @@ import { placeName, verdictScript } from "../src/domain/scripts.ts";
 import { signAethexPayload, verifyAethexSignature } from "../src/webhooks/signature.ts";
 import { inWindow, localMinutes, startOfLocalDay } from "../src/time.ts";
 import { pickVerifiers } from "../src/workers/cases.ts";
+import { inferVerifierAnswer } from "../src/domain/infer.ts";
 
 const a = (personId: string, answer: VerifierAnswer["answer"], weight = 1, affiliation: string | null = null): VerifierAnswer => ({ personId, answer, weight, affiliation });
 
@@ -128,5 +129,20 @@ describe("time in Africa/Lagos", () => {
   it("handles windows that wrap midnight", () => {
     expect(inWindow(new Date("2027-01-16T21:30:00Z"), "Africa/Lagos", "21:00", "07:00")).toBe(true); // 22:30
     expect(inWindow(new Date("2027-01-16T11:00:00Z"), "Africa/Lagos", "21:00", "07:00")).toBe(false); // 12:00
+  });
+});
+
+describe("verifier answer from transcript (backup)", () => {
+  const t = (...turns: [string, string][]) => turns.map(([role, content]) => ({ role, content }));
+  it("reads the official's answer, not Confam's lines", () => {
+    expect(inferVerifierAnswer(t(["user", "But they didn't believe me."], ["assistant", "Is that true right now? Answer yes or no."], ["user", "Yes. Yes, it is."]))).toMatchObject({ answer: "yes" });
+    expect(inferVerifierAnswer(t(["assistant", "Yes or no?"], ["user", "No o, everything is calm here"]))).toMatchObject({ answer: "no" });
+    expect(inferVerifierAnswer(t(["assistant", "Is it true?"], ["user", "E no true, nothing like that"]))).toMatchObject({ answer: "no" });
+  });
+  it("treats 'I don't know' as unknown and ignores ambiguity or silence", () => {
+    expect(inferVerifierAnswer(t(["user", "I don't know, I'm not there"]))).toMatchObject({ answer: "unknown" });
+    expect(inferVerifierAnswer(t(["user", "yes no maybe"]))).toBeNull();
+    expect(inferVerifierAnswer(t(["assistant", "Hello?"]))).toBeNull();
+    expect(inferVerifierAnswer("not an array")).toBeNull();
   });
 });

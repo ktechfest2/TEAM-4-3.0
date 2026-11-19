@@ -85,7 +85,7 @@ export const identifyCaller = define({
   name: "identify_caller",
   description:
     "Call this at the very start of every call. Returns caller_type: 'official' (a registered presiding officer), 'voter' (on the INEC voter list, with their polling unit) or 'public' (anyone else), plus their name if known.",
-  agents: ["hotline", "official", "verifier", "alert"],
+  agents: ["hotline"],
   schema: z.object({}),
   async handler(_args, call, deps) {
     const prof = await callerProfile(call, deps);

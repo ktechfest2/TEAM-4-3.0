@@ -41,7 +41,15 @@ export async function handleDial(deps: AppDeps, job: DialJob): Promise<DialOutco
       ? await deps.db.select({ kind: role.kind, pu: pollingUnit.name }).from(role).leftJoin(pollingUnit, eq(pollingUnit.id, role.puId)).where(eq(role.id, vr.roleId))
       : [];
     const verifierRole = r?.kind === "official" ? `the presiding officer at ${r.pu ?? place}` : "a trusted community verifier";
-    vars = { ...vars, verifier_name: name, verifier_role: verifierRole, case_question: verifierQuestion({ claimEn: c.claimEn, place }), location_name: place };
+    const claimText = c.claimEn.trim().replace(/[.\s]+$/, "");
+    vars = {
+      ...vars,
+      verifier_name: name || "the presiding officer",
+      verifier_role: verifierRole,
+      case_question: verifierQuestion({ claimEn: c.claimEn, place }),
+      claim_text: claimText.charAt(0).toLowerCase() + claimText.slice(1),
+      location_name: place,
+    };
   } else if (job.purpose === "case_alert" || job.purpose === "notice_alert" || job.purpose === "go_now") {
     const [a] = await deps.db.select().from(alert).where(eq(alert.id, job.rowId));
     if (!a || a.status === "heard" || a.status === "delivered") return { decision: "not_needed" };

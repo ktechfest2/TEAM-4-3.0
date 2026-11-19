@@ -3,6 +3,7 @@ import { z } from "zod";
 import { alert, call, claimCase, notify, QUEUES, report, verificationRequest, type DialJob, type WebhookJob } from "@confam/db";
 import type { AppDeps } from "../context.ts";
 import { findPersonByPhone } from "../people.ts";
+import { inferVerifierAnswer } from "../domain/infer.ts";
 
 const CallEnded = z.object({
   call_id: z.string(),
@@ -81,7 +82,16 @@ export async function handleWebhook(deps: AppDeps, job: WebhookJob): Promise<voi
   // Verification calls that ended without a recorded answer: retry once, then mark no_answer and re-aggregate.
   const [vr] = await deps.db.select().from(verificationRequest).where(eq(verificationRequest.aethexCallId, e.call_id));
   if (vr && vr.status === "calling") {
-    if (vr.attempts < VERIFY_MAX_ATTEMPTS && !completed) {
+    const inferred = completed ? inferVerifierAnswer(e.transcript) : null;
+    if (inferred) {
+      // The official answered on the call but the agent didn't record it: take the answer from the transcript.
+      await deps.db
+        .update(verificationRequest)
+        .set({ status: "answered", answer: inferred.answer, detail: `From the call transcript: "${inferred.evidence.slice(0, 200)}"`, answeredAt: new Date() })
+        .where(eq(verificationRequest.id, vr.id));
+      await deps.jobs.send(QUEUES.caseAggregate, { caseId: vr.caseId, reason: "answer" });
+      deps.log.info({ caseId: vr.caseId, answer: inferred.answer }, "verifier answer inferred from transcript");
+    } else if (vr.attempts < VERIFY_MAX_ATTEMPTS && !completed) {
       await deps.db.update(verificationRequest).set({ status: "pending" }).where(eq(verificationRequest.id, vr.id));
       await deps.jobs.send(QUEUES.dial, { purpose: "verify", personId: vr.personId, refId: vr.caseId, rowId: vr.id, attempt: vr.attempts + 1 } satisfies DialJob, { startAfter: VERIFY_RETRY_DELAY_S });
     } else {
