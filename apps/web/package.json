@@ -9,7 +9,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit -p .",
     "admin:create": "tsx --env-file=../../.env scripts/create-admin.mts",
-    "copy:assets": "node -e \"require('fs').copyFileSync(require.resolve('maplibre-gl/dist/maplibre-gl-worker.mjs'),'public/maplibre-gl-worker.mjs')\"",
+    "copy:assets": "node -e \"const fs=require('fs');fs.mkdirSync('public',{recursive:true});fs.copyFileSync(require.resolve('maplibre-gl/dist/maplibre-gl-worker.mjs'),'public/maplibre-gl-worker.mjs')\"",
     "predev": "npm run copy:assets",
     "prebuild": "npm run copy:assets"
   },
