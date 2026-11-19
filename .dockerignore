@@ -1,0 +1,11 @@
+**/node_modules
+**/.next
+**/.env
+**/.env.*
+!.env.example
+.git
+.verify
+voice-samples
+apps/web/test-results
+apps/web/playwright-report
+apps/web/public/maplibre-gl-worker.mjs
