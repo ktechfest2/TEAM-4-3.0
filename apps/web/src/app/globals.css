@@ -1,0 +1,246 @@
+@import "tailwindcss";
+
+/*
+ * Confam control room. Materials: INEC result sheets (pale green carbonless paper), polling-unit signage
+ * (condensed stencil numerals), rubber verdict stamps, and indelible-ink violet.
+ */
+:root {
+  --ground: #e9ede6; /* result-sheet paper */
+  --surface: #f6f7f2;
+  --surface-2: #dfe5dc;
+  --ink: #0f1f17; /* deep green-black */
+  --muted: #56665d;
+  --line: #c3ccc1;
+  --accent: #0a7a3d; /* INEC green */
+  --accent-ink: #f3f8f2;
+  --violet: #4a2c7a; /* indelible ink: overrides, stamps */
+  --good: #0a7a3d;
+  --bad: #b42318;
+  --warn: #a8670f;
+  --neutral: #56665d;
+  --focus: #4a2c7a;
+
+  --dur-press: 120ms;
+  --dur-ui: 200ms;
+  --dur-panel: 300ms;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #0d1712;
+    --surface: #14211a;
+    --surface-2: #1b2b22;
+    --ink: #e4ece5;
+    --muted: #93a499;
+    --line: #2a3b31;
+    --accent: #3fb36f;
+    --accent-ink: #06170d;
+    --violet: #b79cf0;
+    --good: #3fb36f;
+    --bad: #f0715f;
+    --warn: #e2a948;
+    --neutral: #93a499;
+    --focus: #b79cf0;
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --color-ground: var(--ground);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-violet: var(--violet);
+  --color-good: var(--good);
+  --color-bad: var(--bad);
+  --color-warn: var(--warn);
+  --font-display: var(--font-barlow-condensed);
+  --font-sans: var(--font-barlow);
+  --font-mono: var(--font-plex-mono);
+}
+
+html,
+body {
+  background: var(--ground);
+  color: var(--ink);
+}
+
+body {
+  font-family: var(--font-barlow), system-ui, sans-serif;
+  font-feature-settings: "tnum" 1;
+}
+
+::selection {
+  background: var(--violet);
+  color: var(--surface);
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* Tactile controls: press down, never bounce. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 6px;
+  padding: 0.55rem 0.95rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+  transition:
+    transform var(--dur-press) var(--ease-out),
+    background-color var(--dur-ui) ease,
+    color var(--dur-ui) ease,
+    box-shadow var(--dur-ui) ease;
+}
+.btn:active {
+  transform: scale(0.97);
+}
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.btn-primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.btn-quiet {
+  background: transparent;
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.btn-violet {
+  background: var(--violet);
+  color: var(--surface);
+}
+@media (hover: hover) and (pointer: fine) {
+  .btn-primary:hover {
+    background: color-mix(in oklab, var(--accent) 86%, black);
+  }
+  .btn-quiet:hover {
+    box-shadow: inset 0 0 0 1px var(--ink);
+  }
+  .btn-violet:hover {
+    background: color-mix(in oklab, var(--violet) 86%, black);
+  }
+}
+
+.field {
+  width: 100%;
+  border-radius: 6px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  padding: 0.55rem 0.7rem;
+  color: var(--ink);
+  transition:
+    border-color var(--dur-ui) ease,
+    box-shadow var(--dur-ui) ease;
+}
+.field:focus {
+  outline: none;
+  border-color: var(--violet);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--violet) 22%, transparent);
+}
+
+.link-u {
+  background: linear-gradient(currentColor 0 0) 0 100% / 0% 1px no-repeat;
+  transition: background-size 350ms var(--ease-out);
+}
+@media (hover: hover) and (pointer: fine) {
+  .link-u:hover {
+    background-size: 100% 1px;
+  }
+}
+
+/* Live-update pulse: a brief ink wash on rows that changed. */
+@keyframes ink-wash {
+  from {
+    background-color: color-mix(in oklab, var(--violet) 16%, transparent);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+.fresh {
+  animation: ink-wash 1.6s var(--ease-out) both;
+}
+
+/* Route transitions (React <ViewTransition>). */
+::view-transition-old(.fade-out) {
+  animation: 140ms ease-in both vt-fade reverse;
+}
+::view-transition-new(.fade-in) {
+  animation: 260ms var(--ease-out) both vt-rise;
+}
+@keyframes vt-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes vt-rise {
+  from {
+    opacity: 0;
+    translate: 0 10px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+::view-transition {
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+  }
+}
+
+.maplibregl-ctrl-attrib {
+  font-size: 10px;
+}
+
+/* Login hero: lines rise inside a mask (never hidden at opacity 0), then the stamp lands. */
+@keyframes rise {
+  from {
+    transform: translateY(105%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+@keyframes stamp {
+  from {
+    opacity: 0;
+    transform: rotate(-16deg) scale(1.5);
+  }
+  to {
+    opacity: 0.25;
+    transform: rotate(-8deg) scale(1);
+  }
+}

@@ -11,3 +11,8 @@ coverage/
 *.log
 .turbo/
 voice-samples/
+apps/web/public/maplibre-gl-worker.mjs
+apps/web/test-results/
+apps/web/playwright-report/
+apps/web/next-env.d.ts
+*.tsbuildinfo
