@@ -94,3 +94,29 @@ test("people form rejects a bad phone number", async ({ page }) => {
   await expect(page.getByRole("status").filter({ hasText: /phone/i })).toBeVisible();
   await expect(page.getByText("Team phone").first()).toBeVisible();
 });
+
+test("every signed-in page renders without console errors, failed requests or horizontal overflow", async ({ page }) => {
+  test.skip(!PASSWORD, "ADMIN_PASSWORD not set");
+  const problems: string[] = [];
+  page.on("console", (m) => {
+    if (m.type() === "error") problems.push(`console: ${m.text()}`);
+  });
+  page.on("pageerror", (e) => problems.push(`pageerror: ${e.message}`));
+  page.on("response", (r) => {
+    const url = r.url();
+    // Map tiles come from a third-party CDN and the SSE stream is aborted on navigation by design.
+    if (r.status() >= 400 && url.startsWith("http://localhost") && !url.includes("/api/stream")) problems.push(`HTTP ${r.status()} ${url}`);
+  });
+  await signIn(page);
+  for (const path of ["/", "/rumours", "/rumours?status=verifying", "/rumours?status=published", "/units", "/people", "/calls", "/settings"]) {
+    await page.goto(path);
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await page.waitForTimeout(600);
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    if (overflow > 1) problems.push(`horizontal overflow ${overflow}px on ${path}`);
+  }
+  // Streaming (loading.tsx) commits a 200 before notFound() runs; the not-found UI is what users get.
+  await page.goto("/rumours/00000000-0000-0000-0000-000000000000");
+  await expect(page.getByRole("heading", { name: "Not on the register" })).toBeVisible();
+  expect(problems.filter((p) => !/HTTP 404 .*00000000-0000/.test(p) && !/status of 404/.test(p))).toEqual([]);
+});

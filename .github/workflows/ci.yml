@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: confam
+          POSTGRES_PASSWORD: confam
+          POSTGRES_DB: confam
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U confam" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://confam:confam@localhost:5432/confam_test
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: |
+          (cd packages/db && npx tsc --noEmit -p .)
+          (cd apps/brain && npx tsc --noEmit -p .)
+          (cd apps/web && npx next typegen && npx tsc --noEmit -p .)
+      - name: Lint
+        run: npm run lint -w @confam/web
+      - name: Brain unit + integration tests
+        run: npm test -w @confam/brain
+      - name: Dashboard production build
+        run: npm run build -w @confam/web

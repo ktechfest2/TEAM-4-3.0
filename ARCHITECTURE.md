@@ -123,7 +123,7 @@ flowchart TB
 | Jobs | **pg-boss 10** | Durable jobs, retries, cron and singleton keys on Postgres | Redis/BullMQ |
 | DB | **Postgres 16 + Drizzle ORM + pg_trgm** | One store. Trigram similarity for claim matching, no embedding vendor needed | pgvector + embedding API (extra key and latency, not needed at demo scale) |
 | Dashboard | **Next.js 15 App Router + Tailwind 4 + Motion + GSAP**, MapLibre GL | House stack. Server components read the DB, server actions enqueue jobs, SSE for live updates (Postgres LISTEN/NOTIFY) | SPA |
-| Auth (dashboard) | Email + password (argon2id), signed httpOnly session cookie (jose), roles `admin` / `viewer` | No email provider needed | Magic links (needs SMTP) |
+| Auth (dashboard) | Email + password (scrypt via node:crypto), signed httpOnly session cookie (jose), roles `admin` / `viewer` | No email provider or native dependency needed | Magic links (needs SMTP), argon2 (native build) |
 | Tests | Vitest, Testcontainers Postgres, Playwright, `motion-check.mjs` | — | — |
 | Hosting | **Railway** (brain, web, Postgres) | CLI available, private networking | — |
 | Monorepo | **npm workspaces**: `packages/db`, `apps/brain`, `apps/web` | Shared schema and job names | — |
@@ -312,3 +312,9 @@ erDiagram
 | 8 | 11-19 | Demo data: real Surulere wards, demo PUs/people flagged, only team phones dialled | No public INEC PU API. Never call strangers | Scraping INEC (captcha, ToS) |
 | 9 | 11-19 | Flash line dropped | Only works with a +234 number | — |
 | 10 | 11-19 | npm workspaces (pnpm not installed) | Zero setup | pnpm |
+| 11 | 11-19 | scrypt (node:crypto) for PINs and passwords instead of argon2 | Memory-hard, no native module to build on Railway | argon2id |
+| 12 | 11-19 | TypeScript 6 across the repo | typescript-eslint does not support TS 7 yet | TS 7 |
+| 13 | 11-19 | Next.js `cacheComponents: false` | Every control-room view is live data; classic dynamic rendering is simpler and correct | Cache Components + Suspense everywhere |
+| 14 | 11-19 | Serve MapLibre's worker from `public/` (copied at build) | Turbopack breaks MapLibre's default worker loading | CDN worker URL |
+| 15 | 11-19 | Agent `messaging_system_prompt` mirrors the voice prompt | Lets chat-based evals test the same behaviour callers get | Separate chat prompt |
+| 16 | 11-19 | Override handled by a brain worker (`case-override` queue) | One place owns verdict logic; web only enqueues | Web writes verdicts directly |

@@ -31,9 +31,11 @@ export default async function Login() {
       </section>
       <section className="flex items-center px-6 py-12 sm:px-12">
         <div className="w-full max-w-sm">
-          <h2 className="font-display text-4xl font-bold uppercase">Control room sign in</h2>
-          <p className="mt-2 text-muted">Use the account your coordinator created for you.</p>
-          <LoginForm />
+          <h2 className="animate-[enter_600ms_350ms_cubic-bezier(0.23,1,0.32,1)_both] font-display text-4xl font-bold uppercase">Control room sign in</h2>
+          <p className="mt-2 animate-[enter_600ms_430ms_cubic-bezier(0.23,1,0.32,1)_both] text-muted">Use the account your coordinator created for you.</p>
+          <div className="animate-[enter_600ms_510ms_cubic-bezier(0.23,1,0.32,1)_both]">
+            <LoginForm />
+          </div>
         </div>
       </section>
     </main>
