@@ -88,6 +88,14 @@ describe("seed upgrade from the first version", () => {
     const roles = await env.deps.db.select().from(role).where(eq(role.personId, official!.id));
     expect(roles.map((x) => x.kind)).toEqual(["official"]);
   });
+  it("strips legacy supervisor/verifier roles from numbers declared as voters", async () => {
+    const [voterA] = await env.deps.db.select().from(person).where(eq(person.phoneHash, env.crypto.hash(VOTER_A)));
+    const [official] = await env.deps.db.select().from(role).where(eq(role.kind, "official"));
+    await env.deps.db.insert(role).values({ personId: voterA!.id, kind: "supervisor", wardId: official!.wardId });
+    const { seed } = await import("@confam/db");
+    await seed(env.handle.db, env.crypto, { officialPhones: [OFFICIAL], voterPhones: [VOTER_A, VOTER_B], officialPin: OFFICIAL_PIN });
+    expect(await env.deps.db.select().from(role).where(eq(role.personId, voterA!.id))).toHaveLength(0);
+  });
 });
 
 describe("who is calling", () => {

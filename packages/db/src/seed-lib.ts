@@ -1,5 +1,5 @@
 import { randomInt } from "node:crypto";
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { Db } from "./client.ts";
 import { normalizePhone, type PhoneCrypto } from "./phone.ts";
 import { person, pollingUnit, role, subscription, systemSettings, ward } from "./schema.ts";
@@ -108,6 +108,12 @@ export async function seed(db: Db, crypto: PhoneCrypto, opts: SeedOptions): Prom
       .values({ personId: id, puId: pu.id, kind: "voter", needs: [] })
       .onConflictDoUpdate({ target: [subscription.personId, subscription.puId], set: { kind: "voter", active: true } });
     created.push(`voter ••${last4} → ${pu.name}`);
+  }
+
+  // Numbers declared in configuration keep only their declared role: strip legacy verifier/supervisor roles from the first seed.
+  for (const phone of [...opts.officialPhones, ...opts.voterPhones]) {
+    const [p] = await db.select({ id: person.id }).from(person).where(and(eq(person.phoneHash, crypto.hash(normalizePhone(phone))), isNull(person.deletedAt))).limit(1);
+    if (p) await db.delete(role).where(and(eq(role.personId, p.id), inArray(role.kind, ["verifier", "supervisor"])));
   }
 
   const [counts] = await db
