@@ -74,6 +74,22 @@ describe("seed", () => {
   });
 });
 
+describe("seed upgrade from the first version", () => {
+  it("reassigns legacy 'Team phone' records even when their old roles have verification history", async () => {
+    const [official] = await env.deps.db.select().from(person).where(eq(person.phoneHash, env.crypto.hash(OFFICIAL)));
+    await env.deps.db.update(person).set({ displayName: "Team phone 1" }).where(eq(person.id, official!.id));
+    const [oldRole] = await env.deps.db.select().from(role).where(eq(role.personId, official!.id));
+    const r = await tool("report_claim", { claim_en: "Vote buying at Ojuelegba", category: "vote_buying", place: "Ojuelegba" }, { callId: env.aethex.addInbound(PUBLIC) });
+    await env.deps.db.insert(verificationRequest).values({ caseId: r.body.case_id, personId: official!.id, roleId: oldRole!.id });
+    const { seed } = await import("@confam/db");
+    await seed(env.handle.db, env.crypto, { officialPhones: [OFFICIAL], voterPhones: [VOTER_A, VOTER_B], officialPin: OFFICIAL_PIN });
+    const [vr] = await env.deps.db.select().from(verificationRequest).where(eq(verificationRequest.caseId, r.body.case_id));
+    expect(vr!.roleId).toBeNull(); // history kept, link cleared
+    const roles = await env.deps.db.select().from(role).where(eq(role.personId, official!.id));
+    expect(roles.map((x) => x.kind)).toEqual(["official"]);
+  });
+});
+
 describe("who is calling", () => {
   it("identifies officials, voters and the public", async () => {
     expect((await tool("identify_caller", {}, { callId: env.aethex.addInbound(OFFICIAL) })).body.caller_type).toBe("official");

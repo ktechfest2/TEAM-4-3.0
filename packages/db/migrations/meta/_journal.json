@@ -15,6 +15,13 @@
       "when": 1795091618491,
       "tag": "0001_voters_officials",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795092363298,
+      "tag": "0002_keep_verification_history",
+      "breakpoints": true
     }
   ]
 }

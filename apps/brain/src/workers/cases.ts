@@ -142,7 +142,7 @@ export async function handleCaseAggregate(deps: AppDeps, job: CaseAggregateJob):
 
     const label = await placeLabel(deps, c.wardId, c.puId);
     const winning = result.verdict === "confirmed" ? "yes" : result.verdict === "false" ? "no" : null;
-    const source = winning ? await sourceLabel(deps, reqs.filter((r) => r.status === "answered" && r.answer === winning).map((r) => r.roleId)) : null;
+    const source = winning ? await sourceLabel(deps, reqs.filter((r) => r.status === "answered" && r.answer === winning).map((r) => r.roleId).filter((id): id is string => id !== null)) : null;
     const script = verdictScript({ verdict: result.verdict, category: c.category as Category, claimEn: c.claimEn, place: label, yes: result.yes, no: result.no, source });
     const basis =
       result.verdict === "unverified"
@@ -260,7 +260,7 @@ export async function overrideVerdict(
     if (input.verdict !== "unverified") {
       const truth = input.verdict === "confirmed" ? "yes" : "no";
       for (const r of reqs) {
-        if (r.answer === "unknown") continue;
+        if (r.answer === "unknown" || !r.roleId) continue;
         await tx
           .update(role)
           .set({ reputation: sql`least(2, greatest(0.2, ${role.reputation} + ${r.answer === truth ? 0.1 : -0.2}))` })

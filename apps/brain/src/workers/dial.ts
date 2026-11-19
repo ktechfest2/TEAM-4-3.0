@@ -37,7 +37,9 @@ export async function handleDial(deps: AppDeps, job: DialJob): Promise<DialOutco
     const [c] = await deps.db.select().from(claimCase).where(eq(claimCase.id, vr.caseId));
     if (!c || c.status !== "verifying") return { decision: "not_needed" };
     const place = await puLabel(deps, c.puId, c.wardId);
-    const [r] = await deps.db.select({ kind: role.kind, pu: pollingUnit.name }).from(role).leftJoin(pollingUnit, eq(pollingUnit.id, role.puId)).where(eq(role.id, vr.roleId));
+    const [r] = vr.roleId
+      ? await deps.db.select({ kind: role.kind, pu: pollingUnit.name }).from(role).leftJoin(pollingUnit, eq(pollingUnit.id, role.puId)).where(eq(role.id, vr.roleId))
+      : [];
     const verifierRole = r?.kind === "official" ? `the presiding officer at ${r.pu ?? place}` : "a trusted community verifier";
     vars = { ...vars, verifier_name: name, verifier_role: verifierRole, case_question: verifierQuestion({ claimEn: c.claimEn, place }), location_name: place };
   } else if (job.purpose === "case_alert" || job.purpose === "notice_alert" || job.purpose === "go_now") {

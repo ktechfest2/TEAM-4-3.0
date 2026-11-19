@@ -178,7 +178,8 @@ export const verificationRequest = pgTable(
     id: id(),
     caseId: uuid("case_id").notNull().references(() => claimCase.id, { onDelete: "cascade" }),
     personId: uuid("person_id").notNull().references(() => person.id),
-    roleId: uuid("role_id").notNull().references(() => role.id),
+    /** nullable so removing an official or verifier keeps the verification history */
+    roleId: uuid("role_id").references(() => role.id, { onDelete: "set null" }),
     status: text("status", { enum: ["pending", "calling", "answered", "no_answer", "skipped", "failed"] })
       .notNull()
       .default("pending"),
