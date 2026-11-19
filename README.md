@@ -146,7 +146,7 @@ Full design: [ARCHITECTURE.md](ARCHITECTURE.md) · Research and sources: [docs/r
 ## Try it
 
 1. **Call +1 864 808 9401** and ask *"Where is Ojuelegba Primary School polling unit?"*, or report a rumour, in whatever language you speak.
-2. **Open the control room** at https://web-production-13f1563e.up.railway.app/control. Ask the team for a judge login, add your own number to the **Voter list**, then press **Move and call**.
+2. **Open the control room** at https://web-production-13f1563e.up.railway.app/control. The judge login is already filled in, so just press **Sign in**. Add your own number to the **Voter list**, then press **Move and call**.
 3. Register yourself under **Officials** to receive Confam's verification calls when someone reports a rumour at your polling unit.
 
 The demo covers the 12 real wards of Surulere LGA. The polling units in it are demo records, because INEC's polling-unit directory isn't publicly downloadable.
@@ -177,9 +177,9 @@ Tests: `npm test -w @confam/brain` (needs Postgres) and `npx playwright test -c 
 
 ## Credits and AI declaration
 
-**AI coding assistant (declared under rule 1.4).** Confam was designed and built during the hackathon with **Claude Code, powered by Claude Opus 5.5** (Anthropic), working with our team. It handled the research, architecture, backend, control room, tests, landing page and deployment, under our direction and testing on real phones.
+**AI coding assistant:** Claude.
 
-**AI models used in the product (rule 1.2)**
+**AI models used in the product**
 - [Aethex AI](https://aethexai.com) voice agents: speech recognition, turn-taking and Nigerian-accented voices.
 - [Claude Haiku 4.5](https://www.anthropic.com/claude) by Anthropic, as the agents' language model (through Aethex).
 - [Higgsfield](https://higgsfield.ai) (GPT Image model) for the landing-page photographs of Amara, her father and the presiding officer. They are AI-generated illustrations, not real people.

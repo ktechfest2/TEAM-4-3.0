@@ -32,9 +32,11 @@ export default async function Login() {
       <section className="flex items-center px-6 py-12 sm:px-12">
         <div className="w-full max-w-sm">
           <h2 className="animate-[enter_600ms_350ms_cubic-bezier(0.23,1,0.32,1)_both] font-display text-4xl font-bold uppercase">Control room sign in</h2>
-          <p className="mt-2 animate-[enter_600ms_430ms_cubic-bezier(0.23,1,0.32,1)_both] text-muted">Use the account your coordinator created for you.</p>
+          <p className="mt-2 animate-[enter_600ms_430ms_cubic-bezier(0.23,1,0.32,1)_both] text-muted">
+            {process.env.JUDGE_EMAIL ? "Judges: the demo login is already filled in. Just press Sign in." : "Use the account your coordinator created for you."}
+          </p>
           <div className="animate-[enter_600ms_510ms_cubic-bezier(0.23,1,0.32,1)_both]">
-            <LoginForm />
+            <LoginForm judgeEmail={process.env.JUDGE_EMAIL} judgePassword={process.env.JUDGE_PASSWORD} />
           </div>
         </div>
       </section>

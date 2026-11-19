@@ -142,3 +142,11 @@ test("landing page tells the story and links to the phone line and control room"
   const overflow = await page.goto("/").then(() => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth));
   expect(overflow).toBeLessThanOrEqual(1);
 });
+
+test("judges can sign in with the pre-filled demo login by pressing Sign in", async ({ page }) => {
+  test.skip(!process.env.JUDGE_EMAIL, "JUDGE_EMAIL not set");
+  await page.goto("/login");
+  await expect(page.getByLabel("Email")).toHaveValue(process.env.JUDGE_EMAIL!);
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page).toHaveURL(/\/control$/);
+});
