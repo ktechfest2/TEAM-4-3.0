@@ -96,3 +96,14 @@ Researched 2026-11-18. Each claim has a source link. Items marked **UNVERIFIED**
 - **Languages:** **Yoruba, Hausa, Igbo and Pidgin are not named anywhere in the docs.** Support is unknown and needs testing.
 
 **Aethex workarounds.** No plan unlocks local languages. They are gated as "enterprise", not by tier (Hobby, Starter and Builder only differ in credits). BYO-LLM doesn't help because Aethex still owns STT/TTS. The only workaround on our plan is **Pidgin through the prompt** on an English agent with a Nigerian voice.
+
+## 10. Live tests on the Aethex account (2026-11-19)
+
+All tests were run with the team key. The audio files are in `voice-samples/` (gitignored).
+
+1. **STT understands real Yoruba, Hausa and Igbo.** We used native-speaker clips (HF `shunyalabs/yoruba-speech-dataset`, `shunyalabs/hausa-speech-dataset`, `mkg25gpx/igbosyncorp-igbo-asr-benchmark`), converted them to 8 kHz phone quality, and sent them to `POST /transcribe` with `language=english`. The transcripts were near-verbatim, and Yoruba even kept its tone marks. Example: truth "fred ń sáré ní máìlì 105…", heard "fred ń sáré ní máìlì 15…". The Hausa and Igbo clips were similarly accurate.
+2. **Pidgin STT works.** One clip was near-perfect. Another came back in a phonetic Krio-like spelling ("a dɔn chɛk da jist…"), which is still readable by an LLM.
+3. **The agent LLM understands Yoruba, Hausa and Igbo and replies in Pidgin or English.** We tested a temporary agent (claude-sonnet-4-6) through `POST /agents/:id/chat` and deleted it afterwards. Every rumour question ("fighting at Ojuelegba PU, is it true?") was understood correctly. The model sometimes opened with a local-language phrase ("Mo gbọ́ pé…"), so the prompt must forbid local-language words in replies (the TTS can't say them) and forbid emoji.
+4. **TTS cannot speak Yoruba, Hausa or Igbo.** Nigerian English voices reading local-language text and transcribed back gave: Hausa partly intelligible ("bakada safia … makaranta st mary"), Yoruba and Igbo garbled ("ibùdó ìdìbò" became "ibɛdo ẹdebe"). The tones are lost.
+
+**Resulting design option:** a caller can **speak** Yoruba, Hausa, Igbo, Pidgin or English and be understood. Confam **replies** in Pidgin or Nigerian English. When Aethex enterprise access arrives, replies switch to native-language voices.
