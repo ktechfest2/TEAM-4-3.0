@@ -2,6 +2,8 @@
 
 **Team 4, K-Tech Fest, "Every Vote, Every Voice"**
 
+**▶ [Watch the demo video (3:35)](https://drive.google.com/file/d/1W2PJHUGUODDTcSwBAaNOV5R_dVBmCklx/view?usp=sharing)** · [Live website](https://web-production-13f1563e.up.railway.app) · Call Confam: **+1 864 808 9401**
+
 ## The link we chose
 **Voter information and misinformation**, plus visibility of polling staff on election morning. This is the first link in the voting chain (*inform voters → identify → move staff and materials → vote and count → transmit → disputes*). Every later link depends on people trusting what they hear.
 

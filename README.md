@@ -2,9 +2,11 @@
 
 **A phone number that tells Nigerian voters what's true on election day, and calls them when something changes.**
 
-*Built for K-Tech Fest, "Every Vote, Every Voice".* · [Website](https://web-production-13f1563e.up.railway.app) · [INEC control room](https://web-production-13f1563e.up.railway.app/control) · [One-page problem brief](docs/problem-brief.md) · Call Confam: **+1 864 808 9401**
+*Built for K-Tech Fest, "Every Vote, Every Voice".* · **[▶ Demo video (3:35)](https://drive.google.com/file/d/1W2PJHUGUODDTcSwBAaNOV5R_dVBmCklx/view?usp=sharing)** · [Website](https://web-production-13f1563e.up.railway.app) · [INEC control room](https://web-production-13f1563e.up.railway.app/control) · [One-page problem brief](docs/problem-brief.md) · Call Confam: **+1 864 808 9401**
 
-![Confam, the voter line](docs/images/landing-hero.png)
+[![Watch the demo: Amara's election morning, with Confam (3:35)](docs/images/demo-video.jpg)](https://drive.google.com/file/d/1W2PJHUGUODDTcSwBAaNOV5R_dVBmCklx/view?usp=sharing)
+
+**▶ [Watch the 3½-minute demo](https://drive.google.com/file/d/1W2PJHUGUODDTcSwBAaNOV5R_dVBmCklx/view?usp=sharing)**: Amara's election morning, first without Confam, then with it. The calls you hear in scenes 1–3 are real Confam calls, recorded live against the production system while the real INEC control room updated on screen.
 
 ---
 
@@ -167,6 +169,7 @@ Tests: `npm test -w @confam/brain` (needs Postgres) and `npx playwright test -c 
 ## Honest limits
 
 - **The number is American (+1 864 808 9401).** We had 48 hours, and getting a Nigerian number takes regulatory paperwork we couldn't finish in time. Two side effects you may notice: calling it from Nigeria is an international call, and Confam's calls to Nigerian phones sometimes show up as a random local number, because international routes into Nigeria often replace the caller ID. A Nigerian number fixes both.
+- **About the demo video.** Amara, Baba and the presiding officer are AI-generated characters with AI voices; the film shots were generated. Confam's side of the calls in scenes 1–3 is the real agent answering live, and the control room footage is the real dashboard. Our voice-agent credits ran out before the rumour scene, so scene 4's call audio is re-enacted from Confam's real production scripts (the rumour case shown in the control room is a real one, verified by a real official on a real call). The video says this on screen.
 - **The voter list and polling units are demo data.** The 12 Surulere wards are real; the polling units and voter list stand in for INEC's register, which isn't public.
 
 ## What's next
